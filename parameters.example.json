@@ -5,26 +5,56 @@
     "location": {
       "value": "japaneast"
     },
-    "resourceGroupPrefix": {
-      "value": "rg-dify"
-    },
     "pgsqlUser": {
       "value": "adminuser"
     },
     "pgsqlPassword": {
       "value": "YOUR_SECURE_PASSWORD_HERE"
     },
+    "postgresSkuName": {
+      "value": "Standard_B1ms"
+    },
+    "postgresSkuTier": {
+      "value": "Burstable"
+    },
+    "postgresStorageGB": {
+      "value": 32
+    },
+    "postgresEnableHA": {
+      "value": false
+    },
+    "redisCapacity": {
+      "value": 0
+    },
     "isProvidedCert": {
       "value": false
     },
     "acaCertPassword": {
-      "value": "YOUR_CERT_PASSWORD_HERE"
+      "value": ""
     },
     "acaAppMinCount": {
-      "value": 1
+      "value": 0
     },
     "isAcaEnabled": {
       "value": true
+    },
+    "apiCpu": {
+      "value": "2"
+    },
+    "apiMemory": {
+      "value": "4Gi"
+    },
+    "workerCpu": {
+      "value": "2"
+    },
+    "workerMemory": {
+      "value": "4Gi"
+    },
+    "webCpu": {
+      "value": "1"
+    },
+    "webMemory": {
+      "value": "2Gi"
     }
   }
 }

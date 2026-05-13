@@ -10,26 +10,22 @@ Front-end access:
 Back-end components:
 - web -> Azure Container Apps (Serverless)
 - api -> Azure Container Apps (Serverless)
-- worker -> Azure Container Apps (minimum of 1 instance)
+- worker -> Azure Container Apps (Serverless)
 - sandbox -> Azure Container Apps (Serverless)
 - ssrf_proxy -> Azure Container Apps (Serverless)
 - db -> Azure Database for PostgreSQL
 - vectordb -> Azure Database for PostgreSQL
 - redis -> Azure Cache for Redis
 
-Before you provision Dify, please check and set the variables in parameters.json file.
-
-### Bicep Variables Documentation
-
-This document provides detailed descriptions of the variables used in the Bicep configuration for setting up the Dify environment.
+Before you provision Dify, please check and set the variables in your parameters file.
 
 ### ⚠️ Security Notice
 
-**IMPORTANT**: The `parameters.json` file contains sensitive information such as database passwords and certificate passwords. 
+**IMPORTANT**: The parameters file contains sensitive information such as database passwords and certificate passwords.
 
 Before deploying:
 
-1. **Copy the example file**: 
+1. **Copy the example file**:
    ```bash
    cp parameters.example.json parameters.json
    ```
@@ -46,16 +42,26 @@ Before deploying:
 - Consider using a password manager to generate and store secure passwords
 
 ### Kick Start
-```bash
+
+```powershell
 az login
 az account set --subscription <subscription-id>
 
 # Copy and configure parameters file
 cp parameters.example.json parameters.json
-# Edit parameters.json with your secure passwords
+# Edit parameters.json with your secure passwords and settings
 
+# Deploy to dev environment (default)
 ./deploy.ps1
+
+# Deploy to prod environment
+./deploy.ps1 -Environment prod
+
+# Skip Bicep deployment (resource group setup only)
+./deploy.ps1 -SkipDeploy
 ```
+
+The script automatically creates the resource group and the ACA infrastructure resource group before deployment.
 
 ### Deployment Parameters
 
@@ -64,12 +70,6 @@ cp parameters.example.json parameters.json
 - **Parameter Name**: `location`
 - **Type**: `string`
 - **Default Value**: `japaneast`
-
-#### Resource Group Prefix
-
-- **Parameter Name**: `resourceGroupPrefix`
-- **Type**: `string`
-- **Default Value**: `rg-dify`
 
 ### Network Parameters
 
@@ -97,6 +97,11 @@ cp parameters.example.json parameters.json
 - **Type**: `string`
 - **Default Value**: `acadifyredis`
 
+- **Parameter Name**: `redisCapacity`
+- **Type**: `int`
+- **Default Value**: `0` (250MB)
+- **Note**: 0=250MB, 1=1GB, 2=6GB, 3=13GB
+
 #### PostgreSQL Flexible Server
 
 - **Parameter Name**: `psqlFlexibleBase`
@@ -112,9 +117,31 @@ cp parameters.example.json parameters.json
 #### PostgreSQL Password
 
 - **Parameter Name**: `pgsqlPassword`
+- **Type**: `string` (secure)
+- **Default Value**: *(empty — must be set)*
+- **Note**: **Must be set before deployment.** Use a strong password with at least 8 characters including uppercase, lowercase, and numbers.
+
+#### PostgreSQL SKU
+
+- **Parameter Name**: `postgresSkuName`
 - **Type**: `string`
-- **Default Value**: `YOUR_SECURE_PASSWORD_HERE`
-- **Note**: Specified as a secure parameter. **Must be changed before deployment.** Use a strong password with at least 8 characters including uppercase, lowercase, and numbers.
+- **Default Value**: `Standard_B1ms`
+
+- **Parameter Name**: `postgresSkuTier`
+- **Type**: `string`
+- **Default Value**: `Burstable`
+
+#### PostgreSQL Storage
+
+- **Parameter Name**: `postgresStorageGB`
+- **Type**: `int`
+- **Default Value**: `32`
+
+#### PostgreSQL High Availability
+
+- **Parameter Name**: `postgresEnableHA`
+- **Type**: `bool`
+- **Default Value**: `false`
 
 ### ACA Environment Parameters
 
@@ -130,61 +157,69 @@ cp parameters.example.json parameters.json
 - **Type**: `string`
 - **Default Value**: `dify-loga`
 
+#### ACA App Minimum Instance Count
+
+- **Parameter Name**: `acaAppMinCount`
+- **Type**: `int`
+- **Default Value**: `0`
+
+#### Enable ACA (Redis conditional deployment)
+
+- **Parameter Name**: `isAcaEnabled`
+- **Type**: `bool`
+- **Default Value**: `false`
+- **Note**: Set to `true` to deploy Azure Cache for Redis
+
 #### IF BRING YOUR OWN CERTIFICATE
 
 - **Parameter Name**: `isProvidedCert`
 - **Type**: `bool`
 - **Default Value**: `false`
 
-
-##### ACA Certificate Path (if isProvidedCert is true)
+##### ACA Certificate (if isProvidedCert is true)
 
 - **Parameter Name**: `acaCertBase64Value`
-- **Type**: `string`
-- **Default Value**: ``
-- **Note**: Specified as a secure parameter
+- **Type**: `string` (secure)
+- **Default Value**: *(empty)*
 
 ##### ACA Certificate Password (if isProvidedCert is true)
 
 - **Parameter Name**: `acaCertPassword`
-- **Type**: `string`
-- **Default Value**: `YOUR_CERT_PASSWORD_HERE`
-- **Note**: Specified as a secure parameter. **Only required if you bring your own certificate** (`isProvidedCert` is `true`). Must be changed before deployment.
+- **Type**: `string` (secure)
+- **Default Value**: *(empty)*
+- **Note**: Only required if `isProvidedCert` is `true`.
 
-##### ACA Dify Customer Domain (if isProvidedCert is false)
+##### ACA Dify Custom Domain
 
 - **Parameter Name**: `acaDifyCustomerDomain`
 - **Type**: `string`
 - **Default Value**: `dify.example.com`
 
-#### ACA App Minimum Instance Count
-
-- **Parameter Name**: `acaAppMinCount`
-- **Type**: `int`
-- **Default Value**: `1`
-
 #### Container Images
-
-##### Dify API Image
 
 - **Parameter Name**: `difyApiImage`
 - **Type**: `string`
 - **Default Value**: `langgenius/dify-api:1.10.1-fix.1`
 
-#### Dify Sandbox Image
-
 - **Parameter Name**: `difySandboxImage`
 - **Type**: `string`
 - **Default Value**: `langgenius/dify-sandbox:0.2.12`
-
-##### Dify Web Image
 
 - **Parameter Name**: `difyWebImage`
 - **Type**: `string`
 - **Default Value**: `langgenius/dify-web:1.10.1-fix.1`
 
-##### Dify Plugin Daemon Image
-
 - **Parameter Name**: `difyPluginDaemonImage`
 - **Type**: `string`
 - **Default Value**: `langgenius/dify-plugin-daemon:0.4.1-local`
+
+#### Container Resources
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `apiCpu` | `2` | API container CPU cores |
+| `apiMemory` | `4Gi` | API container memory |
+| `workerCpu` | `2` | Worker container CPU cores |
+| `workerMemory` | `4Gi` | Worker container memory |
+| `webCpu` | `1` | Web container CPU cores |
+| `webMemory` | `2Gi` | Web container memory |
