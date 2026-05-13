@@ -14,7 +14,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
         '${ipPrefix}.0.0/16'
       ]
     }
-    subnets: []
   }
 }
 
@@ -34,7 +33,14 @@ resource acaSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   parent: vnet
   properties: {
     addressPrefix: '${ipPrefix}.2.0/23'  // 10.99.2.0/23 (range of 10.99.2.0/24 + 10.99.3.0/24)
-    delegations: []
+    delegations: [
+      {
+        name: 'aca-delegation'
+        properties: {
+          serviceName: 'Microsoft.App/environments'
+        }
+      }
+    ]
   }
   dependsOn: [
     privateLinkSubnet

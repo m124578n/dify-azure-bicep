@@ -1,14 +1,19 @@
 ﻿param (
     [string]$ResourceGroupName = "",
-    [switch]$SkipDeploy
+    [switch]$SkipDeploy,
+    [ValidateSet("dev", "prod")]
+    [string]$Environment = "dev"
 )
+
+$parametersFile = if ($Environment -eq "prod") { "./parameters.prod.json" } else { "./parameters.json" }
+Write-Host "Environment: $Environment (using $parametersFile)" -ForegroundColor Cyan
 
 # Set default resource group at the beginning of the script (after parameter declaration)
 $env:AZURE_DEFAULTS_GROUP = $ResourceGroupName
 
 # If resource group name is not specified, retrieve it from parameters file
-if (Test-Path "./parameters.json") {
-    $params = Get-Content "./parameters.json" | ConvertFrom-Json
+if (Test-Path $parametersFile) {
+    $params = Get-Content $parametersFile | ConvertFrom-Json
     if ($ResourceGroupName -eq "") {
         $location = $params.parameters.location.value
         $rgPrefix = $params.parameters.resourceGroupPrefix.value
@@ -21,7 +26,7 @@ if (Test-Path "./parameters.json") {
     $pgsqlPassword = $params.parameters.pgsqlPassword.value
 
 } else {
-    Write-Error "parameters.json file not found. Please specify a resource group name."
+    Write-Error "$parametersFile file not found. Please specify a resource group name."
     exit 1
 }
 
@@ -34,9 +39,26 @@ if (-not $loginStatus) {
 
 # Deploy Bicep template if not skipping
 if (-not $SkipDeploy) {
+    # Create resource groups if they don't exist
+    Write-Host "Ensuring resource group '$ResourceGroupName' exists..." -ForegroundColor Cyan
+    az group create --name $ResourceGroupName --location $location --output none
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to create resource group."
+        exit 1
+    }
+
+    # Pre-create ACA infrastructure RG so ACA doesn't need subscription-level permission
+    $acaInfraRG = "rg-dify-aca-infra-$ResourceGroupName"
+    Write-Host "Ensuring ACA infrastructure resource group '$acaInfraRG' exists..." -ForegroundColor Cyan
+    az group create --name $acaInfraRG --location $location --output none
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to create ACA infrastructure resource group."
+        exit 1
+    }
+
     Write-Host "Deploying Bicep template..." -ForegroundColor Cyan
-    az deployment sub create --location japaneast --template-file main.bicep --parameters parameters.json
-    
+    az deployment group create --resource-group $ResourceGroupName --template-file main.bicep --parameters $parametersFile
+
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Bicep deployment failed."
         exit 1

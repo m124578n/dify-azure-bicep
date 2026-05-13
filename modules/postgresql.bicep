@@ -17,6 +17,18 @@ param postgresSubnetId string
 @description('Virtual network ID')
 param vnetId string
 
+@description('PostgreSQL SKU name')
+param postgresSkuName string = 'Standard_B1ms'
+
+@description('PostgreSQL SKU tier')
+param postgresSkuTier string = 'Burstable'
+
+@description('PostgreSQL storage size in GB')
+param postgresStorageGB int = 32
+
+@description('Enable high availability')
+param postgresEnableHA bool = false
+
 // Private DNS zone
 resource postgresDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: 'privatelink.postgres.database.azure.com'
@@ -41,15 +53,15 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' =
   name: serverName
   location: location
   sku: {
-    name: 'Standard_B1ms'
-    tier: 'Burstable'
+    name: postgresSkuName
+    tier: postgresSkuTier
   }
   properties: {
     version: '14'
     administratorLogin: administratorLogin
     administratorLoginPassword: administratorLoginPassword
     storage: {
-      storageSizeGB: 32
+      storageSizeGB: postgresStorageGB
     }
     backup: {
       backupRetentionDays: 7
@@ -60,7 +72,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' =
       privateDnsZoneArmResourceId: postgresDnsZone.id
     }
     highAvailability: {
-      mode: 'Disabled'
+      mode: postgresEnableHA ? 'ZoneRedundant' : 'Disabled'
     }
   }
 }

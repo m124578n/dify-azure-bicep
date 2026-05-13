@@ -72,6 +72,24 @@ param acaDifyCustomerDomain string = ''
 @description('ACA app minimum instance count')
 param acaAppMinCount int = 0
 
+@description('API container CPU')
+param apiCpu string = '2'
+
+@description('API container memory')
+param apiMemory string = '4Gi'
+
+@description('Worker container CPU')
+param workerCpu string = '2'
+
+@description('Worker container memory')
+param workerMemory string = '4Gi'
+
+@description('Web container CPU')
+param webCpu string = '1'
+
+@description('Web container memory')
+param webMemory string = '2Gi'
+
 @description('Dify API image')
 param difyApiImage string
 
@@ -114,7 +132,7 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
     }
     // Use this instead of workloadProfiles
     zoneRedundant: false
-    // Modify subnet connection specification method
+    infrastructureResourceGroup: 'rg-dify-aca-infra-${resourceGroup().name}'
     vnetConfiguration: {
       infrastructureSubnetId: acaSubnetId
       internal: false
@@ -140,6 +158,7 @@ resource nginxFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01' 
 resource difyCerts 'Microsoft.App/managedEnvironments/certificates@2023-05-01' = if (isProvidedCert) {
   name: 'difycerts'
   parent: acaEnv
+  location: location
   properties: {
     password: acaCertPassword
     value: acaCertBase64Value
@@ -411,8 +430,8 @@ resource workerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'langgenius'
           image: difyApiImage
           resources: {
-            cpu: json('2')
-            memory: '4Gi'
+            cpu: json(workerCpu)
+            memory: workerMemory
           }
           env: [
             {
@@ -578,8 +597,8 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'langgenius'
           image: difyApiImage
           resources: {
-            cpu: json('2')
-            memory: '4Gi'
+            cpu: json(apiCpu)
+            memory: apiMemory
           }
           env: [
             {
@@ -1011,8 +1030,8 @@ resource webApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'langgenius'
           image: difyWebImage
           resources: {
-            cpu: json('1')
-            memory: '2Gi'
+            cpu: json(webCpu)
+            memory: webMemory
           }
           env: [
             {

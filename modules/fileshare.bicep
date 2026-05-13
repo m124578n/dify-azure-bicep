@@ -1,6 +1,5 @@
 param storageAccountName string
 param shareName string
-param localMountDir string
 param quota int = 50
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-05-01' existing = {

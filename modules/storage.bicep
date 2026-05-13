@@ -155,5 +155,6 @@ resource filePrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/private
 
 // Output
 output storageAccountName string = storageAccount.name
-output storageAccountKey string = listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value
+#disable-next-line outputs-should-not-contain-secrets
+output storageAccountKey string = storageAccount.listKeys().keys[0].value
 output blobEndpoint string = storageAccount.properties.primaryEndpoints.blob

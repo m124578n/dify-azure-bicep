@@ -1,10 +1,7 @@
-targetScope = 'subscription'
+targetScope = 'resourceGroup'
 
 @description('Region to deploy')
 param location string = 'japaneast'
-
-@description('Resource group name prefix')
-param resourceGroupPrefix string = 'rg'
 
 @description('IP address prefix')
 param ipPrefix string = '10.99'
@@ -26,7 +23,7 @@ param pgsqlUser string = 'user'
 
 @description('PostgreSQL password')
 @secure()
-param pgsqlPassword string = '#QWEASDasdqwe'
+param pgsqlPassword string = ''
 
 @description('ACA environment name')
 param acaEnvName string = 'dify-aca-env'
@@ -43,7 +40,7 @@ param acaCertBase64Value string = ''
 
 @description('Certificate password')
 @secure()
-param acaCertPassword string = 'password'
+param acaCertPassword string = ''
 
 @description('Dify custom domain')
 param acaDifyCustomerDomain string = 'dify.example.com'
@@ -66,21 +63,47 @@ param difyWebImage string = 'langgenius/dify-web:1.10.1-fix.1'
 @description('Dify plugin daemon image')
 param difyPluginDaemonImage string = 'langgenius/dify-plugin-daemon:0.4.1-local'
 
+@description('PostgreSQL SKU name')
+param postgresSkuName string = 'Standard_B1ms'
 
-// Create resource group
-resource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {
-  name: '${resourceGroupPrefix}-${location}'
-  location: location
-}
+@description('PostgreSQL SKU tier')
+param postgresSkuTier string = 'Burstable'
+
+@description('PostgreSQL storage size in GB')
+param postgresStorageGB int = 32
+
+@description('Enable PostgreSQL high availability')
+param postgresEnableHA bool = false
+
+@description('Redis cache capacity (0=250MB, 1=1GB, 2=6GB, 3=13GB)')
+param redisCapacity int = 0
+
+@description('API container CPU')
+param apiCpu string = '2'
+
+@description('API container memory')
+param apiMemory string = '4Gi'
+
+@description('Worker container CPU')
+param workerCpu string = '2'
+
+@description('Worker container memory')
+param workerMemory string = '4Gi'
+
+@description('Web container CPU')
+param webCpu string = '1'
+
+@description('Web container memory')
+param webMemory string = '2Gi'
+
 
 // Generate hash for unique resource names
-var rgNameHex = uniqueString(subscription().id, rg.name)
+var rgNameHex = uniqueString(resourceGroup().id)
 
 // Deploy network-related resources
 module vnetModule './modules/vnet.bicep' = {
   name: 'vnetDeploy'
-  scope: rg
-  params: {
+params: {
     location: location
     ipPrefix: ipPrefix
   }
@@ -89,8 +112,7 @@ module vnetModule './modules/vnet.bicep' = {
 // Deploy storage account and file share
 module storageModule './modules/storage.bicep' = {
   name: 'storageDeploy'
-  scope: rg
-  params: {
+params: {
     location: location
     storageAccountName: '${storageAccountBase}${rgNameHex}'
     containerName: storageAccountContainer
@@ -102,75 +124,69 @@ module storageModule './modules/storage.bicep' = {
 // Deploy file shares
 module nginxFileShareModule './modules/fileshare.bicep' = {
   name: 'nginxFileShareDeploy'
-  scope: rg
-  params: {
+params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'nginx'
-    localMountDir: 'mountfiles/nginx'
   }
 }
 
 module sandboxFileShareModule './modules/fileshare.bicep' = {
   name: 'sandboxFileShareDeploy'
-  scope: rg
-  params: {
+params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'sandbox'
-    localMountDir: 'mountfiles/sandbox'
   }
 }
 
 module ssrfProxyFileShareModule './modules/fileshare.bicep' = {
   name: 'ssrfProxyFileShareDeploy'
-  scope: rg
-  params: {
+params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'ssrfproxy'
-    localMountDir: 'mountfiles/ssrfproxy'
   }
 }
 
 module pluginStorageFileShareModule './modules/fileshare.bicep' = {
   name: 'pluginStorageFileShareDeploy'
-  scope: rg
-  params: {
+params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'pluginstorage'
-    localMountDir: 'mountfiles/pluginstorage'
   }
 }
 
 // Deploy PostgreSQL server
 module postgresqlModule './modules/postgresql.bicep' = {
   name: 'postgresqlDeploy'
-  scope: rg
-  params: {
+params: {
     location: location
     serverName: '${psqlFlexibleBase}${rgNameHex}'
     administratorLogin: pgsqlUser
     administratorLoginPassword: pgsqlPassword
     postgresSubnetId: vnetModule.outputs.postgresSubnetId
     vnetId: vnetModule.outputs.vnetId
+    postgresSkuName: postgresSkuName
+    postgresSkuTier: postgresSkuTier
+    postgresStorageGB: postgresStorageGB
+    postgresEnableHA: postgresEnableHA
   }
 }
 
 // Deploy Redis cache (conditional)
 module redisModule './modules/redis-cache.bicep' = if (isAcaEnabled) {
   name: 'redisDeploy'
-  scope: rg
-  params: {
+params: {
     location: location
     redisName: '${redisNameBase}${rgNameHex}'
     privateLinkSubnetId: vnetModule.outputs.privateLinkSubnetId
     vnetId: vnetModule.outputs.vnetId
+    redisCapacity: redisCapacity
   }
 }
 
 // Deploy ACA environment and apps
 module acaModule './modules/aca-env.bicep' = {
   name: 'acaEnvDeploy'
-  scope: rg
-  params: {
+params: {
     location: location
     acaEnvName: acaEnvName
     acaLogaName: acaLogaName
@@ -192,13 +208,19 @@ module acaModule './modules/aca-env.bicep' = {
     postgresAdminPassword: pgsqlPassword
     postgresDifyDbName: postgresqlModule.outputs.difyDbName
     postgresVectorDbName: postgresqlModule.outputs.vectorDbName
-    redisHostName: isAcaEnabled ? redisModule.outputs.redisHostName : ''
-    redisPrimaryKey: isAcaEnabled ? redisModule.outputs.redisPrimaryKey : ''
+    redisHostName: redisModule.?outputs.redisHostName ?? ''
+    redisPrimaryKey: redisModule.?outputs.redisPrimaryKey ?? ''
     difyApiImage: difyApiImage
     difySandboxImage: difySandboxImage
     difyWebImage: difyWebImage
     difyPluginDaemonImage: difyPluginDaemonImage
     blobEndpoint: storageModule.outputs.blobEndpoint
+    apiCpu: apiCpu
+    apiMemory: apiMemory
+    workerCpu: workerCpu
+    workerMemory: workerMemory
+    webCpu: webCpu
+    webMemory: webMemory
   }
 }
 
