@@ -1,4 +1,29 @@
+# Secrets & credentials
 dify_admin_credentials.txt
 param.txt
+*.credentials.txt
+
+# Parameter files with sensitive values
 parameters.json
 parameters.prod.json
+parameters.*.json
+!parameters.example.json
+
+# Azure CLI
+.azure/
+
+# Bicep build output
+*.json.bak
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
