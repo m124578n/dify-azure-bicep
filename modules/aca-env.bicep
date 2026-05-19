@@ -1,6 +1,9 @@
 @description('Resource location')
 param location string
 
+@description('ACA infrastructure resource group name')
+param acaInfraRGName string
+
 @description('ACA Log Analytics workspace name')
 param acaLogaName string
 
@@ -132,7 +135,7 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
     }
     // Use this instead of workloadProfiles
     zoneRedundant: false
-    infrastructureResourceGroup: 'rg-dify-aca-infra-${resourceGroup().name}'
+    infrastructureResourceGroup: acaInfraRGName
     vnetConfiguration: {
       infrastructureSubnetId: acaSubnetId
       internal: false

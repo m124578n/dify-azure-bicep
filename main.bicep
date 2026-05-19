@@ -25,6 +25,9 @@ param pgsqlUser string = 'user'
 @secure()
 param pgsqlPassword string = ''
 
+@description('ACA infrastructure resource group name')
+param acaInfraRGName string = 'rg-dify-aca-infra'
+
 @description('ACA environment name')
 param acaEnvName string = 'dify-aca-env'
 
@@ -188,6 +191,7 @@ module acaModule './modules/aca-env.bicep' = {
   name: 'acaEnvDeploy'
 params: {
     location: location
+    acaInfraRGName: acaInfraRGName
     acaEnvName: acaEnvName
     acaLogaName: acaLogaName
     acaSubnetId: vnetModule.outputs.acaSubnetId

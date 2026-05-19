@@ -6,6 +6,9 @@
     "location": {
       "value": "japaneast"
     },
+    "acaInfraRGName": {
+      "value": "rg-dify-aca-infra"
+    },
     "pgsqlUser": {
       "value": "adminuser"
     },
