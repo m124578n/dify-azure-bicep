@@ -14,10 +14,13 @@ $env:AZURE_DEFAULTS_GROUP = $ResourceGroupName
 # If resource group name is not specified, retrieve it from parameters file
 if (Test-Path $parametersFile) {
     $params = Get-Content $parametersFile | ConvertFrom-Json
+    $location = $params.parameters.location.value
     if ($ResourceGroupName -eq "") {
-        $location = $params.parameters.location.value
-        $rgPrefix = $params.parameters.resourceGroupPrefix.value
-        $ResourceGroupName = "$rgPrefix-$location"
+        $ResourceGroupName = $params.resourceGroupName
+        if (-not $ResourceGroupName) {
+            Write-Error "resourceGroupName is not set. Add it to $parametersFile or pass -ResourceGroupName."
+            exit 1
+        }
     }
     Write-Host "Resource Group Name: $ResourceGroupName"
     $env:AZURE_DEFAULTS_GROUP = $ResourceGroupName
