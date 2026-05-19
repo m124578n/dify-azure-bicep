@@ -42,22 +42,27 @@ if (-not $loginStatus) {
 
 # Deploy Bicep template if not skipping
 if (-not $SkipDeploy) {
-    # Create resource groups if they don't exist
-    Write-Host "Ensuring resource group '$ResourceGroupName' exists..." -ForegroundColor Cyan
-    az group create --name $ResourceGroupName --location $location --output none
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to create resource group."
-        exit 1
+    # Ensure resource groups exist (skip creation if already exists)
+    function Ensure-ResourceGroup {
+        param ([string]$Name, [string]$Location)
+        $exists = az group exists --name $Name
+        if ($exists -eq "true") {
+            Write-Host "Resource group '$Name' already exists, skipping creation." -ForegroundColor Gray
+        } else {
+            Write-Host "Creating resource group '$Name'..." -ForegroundColor Cyan
+            az group create --name $Name --location $Location --output none
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to create resource group '$Name'. Please ask an admin to create it and grant you Contributor access."
+                exit 1
+            }
+            Write-Host "Resource group '$Name' created." -ForegroundColor Green
+        }
     }
 
-    # Pre-create ACA infrastructure RG so ACA doesn't need subscription-level permission
+    Ensure-ResourceGroup -Name $ResourceGroupName -Location $location
+
     $acaInfraRG = "rg-dify-aca-infra-$ResourceGroupName"
-    Write-Host "Ensuring ACA infrastructure resource group '$acaInfraRG' exists..." -ForegroundColor Cyan
-    az group create --name $acaInfraRG --location $location --output none
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to create ACA infrastructure resource group."
-        exit 1
-    }
+    Ensure-ResourceGroup -Name $acaInfraRG -Location $location
 
     Write-Host "Deploying Bicep template..." -ForegroundColor Cyan
     az deployment group create --resource-group $ResourceGroupName --template-file main.bicep --parameters $parametersFile
