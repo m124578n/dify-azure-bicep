@@ -336,7 +336,7 @@ resource sandboxApp 'Microsoft.App/containerApps@2023-05-01' = {
       ingress: {
         external: false
         targetPort: 8194
-        transport: 'tcp'
+        transport: 'http'
         traffic: [
           {
             latestRevision: true
@@ -581,8 +581,7 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
       ingress: {
         external: false
         targetPort: 5001
-        exposedPort: 5001
-        transport: 'tcp'
+        transport: 'http'
         traffic: [
           {
             latestRevision: true
@@ -850,8 +849,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2023-05-01' = {
       ingress: {
         external: false
         targetPort: 5002
-        exposedPort: 5002
-        transport: 'tcp'
+        transport: 'http'
         traffic: [
           {
             latestRevision: true
@@ -1014,8 +1012,7 @@ resource webApp 'Microsoft.App/containerApps@2023-05-01' = {
       ingress: {
         external: false
         targetPort: 3000
-        exposedPort: 3000
-        transport: 'tcp'
+        transport: 'http'
         traffic: [
           {
             latestRevision: true
