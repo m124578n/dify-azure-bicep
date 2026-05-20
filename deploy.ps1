@@ -61,12 +61,6 @@ if (-not $SkipDeploy) {
 
     Ensure-ResourceGroup -Name $ResourceGroupName -Location $location
 
-    $acaInfraRG = $params.parameters.acaInfraRGName.value
-    if (-not $acaInfraRG) {
-        $acaInfraRG = "rg-dify-aca-infra-$ResourceGroupName"
-    }
-    Ensure-ResourceGroup -Name $acaInfraRG -Location $location
-
     Write-Host "Deploying Bicep template..." -ForegroundColor Cyan
     az deployment group create --resource-group $ResourceGroupName --template-file main.bicep --parameters $parametersFile
 
