@@ -36,44 +36,72 @@ PROD_PASSWORD = os.getenv("DIFY_PROD_PASSWORD", "your-prod-password")
 # UAT app_id → Prod app_id mapping
 # Add entries as: "uat-app-id": "prod-app-id"
 APP_ID_MAP: dict[str, str] = {
-    # "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
+    "4747ffa0-cb7a-4293-b951-01d171d3f75c": "4747ffa0-cb7a-4293-b951-01d171d3f75c",
 }
 
 WORKFLOWS_DIR = Path(__file__).parent / "workflows"
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
-def get_token(base_url: str, email: str, password: str) -> str:
-    resp = requests.post(
+def get_session(base_url: str, email: str, password: str) -> requests.Session:
+    session = requests.Session()
+    resp = session.post(
         f"{base_url}/console/api/login",
         json={"email": email, "password": password, "remember_me": False},
         timeout=30,
     )
     resp.raise_for_status()
-    body = resp.json()
-    token = body.get("data", {}).get("access_token") or body.get("access_token")
-    if not token:
-        print(f"Login response: {json.dumps(body, indent=2)}")
-        raise RuntimeError("Failed to get access_token. Check credentials or response above.")
-    return token
+    cookies = dict(session.cookies)
+    access_token = cookies.get("access_token")
+    csrf_token   = cookies.get("csrf_token")
+
+    if access_token:
+        session.headers.update({"Authorization": f"Bearer {access_token}"})
+    if csrf_token:
+        session.headers.update({"X-CSRF-Token": csrf_token})
+    session.headers.update({
+        "Origin": base_url,
+        "Referer": f"{base_url}/",
+    })
+    return session
+
+# ── List ──────────────────────────────────────────────────────────────────────
+
+def list_apps() -> None:
+    print(f"[List] Logging in to UAT: {UAT_URL}")
+    session = get_session(UAT_URL, UAT_EMAIL, UAT_PASSWORD)
+
+    resp = session.get(f"{UAT_URL}/console/api/apps?page=1&limit=50", timeout=30)
+    resp.raise_for_status()
+    apps = resp.json().get("data", [])
+    if not apps:
+        print("No apps found.")
+        return
+    print(f"\n{'app_id':<38} {'mode':<12} name")
+    print("-" * 70)
+    for app in apps:
+        print(f"{app['id']:<38} {app.get('mode',''):<12} {app.get('name','')}")
 
 # ── Export ─────────────────────────────────────────────────────────────────────
 
 def export_workflow(uat_app_id: str) -> Path:
     print(f"[Export] Logging in to UAT: {UAT_URL}")
-    token = get_token(UAT_URL, UAT_EMAIL, UAT_PASSWORD)
+    session = get_session(UAT_URL, UAT_EMAIL, UAT_PASSWORD)
 
     print(f"[Export] Exporting app {uat_app_id}...")
-    resp = requests.get(
+    resp = session.get(
         f"{UAT_URL}/console/api/apps/{uat_app_id}/export?include_secret=false",
-        headers={"Authorization": f"Bearer {token}"},
         timeout=30,
     )
     resp.raise_for_status()
 
+    # Response is {"data": "<yaml_string>"} — extract the inner YAML
+    body = resp.json()
+    dsl_text = body.get("data") or resp.text
+
     WORKFLOWS_DIR.mkdir(exist_ok=True)
     out_path = WORKFLOWS_DIR / f"{uat_app_id}.yml"
-    out_path.write_text(resp.text, encoding="utf-8")
+    out_path.write_text(dsl_text, encoding="utf-8")
     print(f"[Export] Saved to {out_path}")
     return out_path
 
@@ -103,15 +131,31 @@ def deploy_workflow(uat_app_id: str) -> None:
         raise ValueError("DSL has no workflow.graph — check the exported YAML.")
 
     print(f"[Deploy] Logging in to Prod: {PROD_URL}")
-    token = get_token(PROD_URL, PROD_EMAIL, PROD_PASSWORD)
-    headers = {"Authorization": f"Bearer {token}"}
+    session = get_session(PROD_URL, PROD_EMAIL, PROD_PASSWORD)
+
+    # Get current draft hash (required for conflict check)
+    print(f"[Deploy] Fetching current draft hash for prod app {prod_app_id}...")
+    draft_resp = session.get(
+        f"{PROD_URL}/console/api/apps/{prod_app_id}/workflows/draft",
+        timeout=30,
+    )
+    draft_resp.raise_for_status()
+    current_hash = draft_resp.json().get("hash")
+    print(f"[Deploy] Current draft hash: {current_hash}")
 
     # Update draft
     print(f"[Deploy] Updating draft for prod app {prod_app_id}...")
-    resp = requests.post(
+    payload = {
+        "graph": graph,
+        "features": features,
+        "environment_variables": workflow.get("environment_variables", []),
+        "conversation_variables": workflow.get("conversation_variables", []),
+    }
+    if current_hash:
+        payload["hash"] = current_hash
+    resp = session.post(
         f"{PROD_URL}/console/api/apps/{prod_app_id}/workflows/draft",
-        headers=headers,
-        json={"graph": graph, "features": features},
+        json=payload,
         timeout=30,
     )
     if not resp.ok:
@@ -120,9 +164,8 @@ def deploy_workflow(uat_app_id: str) -> None:
 
     # Publish
     print(f"[Deploy] Publishing...")
-    resp = requests.post(
+    resp = session.post(
         f"{PROD_URL}/console/api/apps/{prod_app_id}/workflows/publish",
-        headers=headers,
         timeout=30,
     )
     if not resp.ok:
@@ -135,12 +178,15 @@ def deploy_workflow(uat_app_id: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Dify workflow deploy tool")
-    parser.add_argument("command", choices=["export", "deploy", "all"],
+    parser.add_argument("command", choices=["list", "export", "deploy", "all"],
                         help="export: save UAT DSL to file | deploy: push to prod | all: both")
-    parser.add_argument("--app-id", required=True, help="UAT app_id")
+    parser.add_argument("--app-id", required=False, help="UAT app_id (not required for list)")
     args = parser.parse_args()
 
     try:
+        if args.command == "list":
+            list_apps()
+            return
         if args.command in ("export", "all"):
             export_workflow(args.app_id)
         if args.command in ("deploy", "all"):
