@@ -221,7 +221,7 @@ resource nginxApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: acaAppMinCount
+        minReplicas: 1
         maxReplicas: 10
         rules: [
           {
@@ -408,7 +408,7 @@ resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'sandbox'
-            tcp: {
+            http: {
               metadata: {
                 concurrentRequests: '10'
               }
@@ -825,7 +825,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'api'
-            tcp: {
+            http: {
               metadata: {
                 concurrentRequests: '10'
               }
@@ -995,8 +995,8 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
         maxReplicas: 10
         rules: [
           {
-            name: 'api'
-            tcp: {
+            name: 'plugin'
+            http: {
               metadata: {
                 concurrentRequests: '10'
               }
@@ -1074,7 +1074,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'web'
-            tcp: {
+            http: {
               metadata: {
                 concurrentRequests: '10'
               }
