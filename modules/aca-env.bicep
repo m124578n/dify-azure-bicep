@@ -346,7 +346,8 @@ resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: false
         targetPort: 8194
-        transport: 'http'
+        exposedPort: 8194
+        transport: 'tcp'
         traffic: [
           {
             latestRevision: true
@@ -408,7 +409,7 @@ resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'sandbox'
-            http: {
+            tcp: {
               metadata: {
                 concurrentRequests: '10'
               }
@@ -593,7 +594,8 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: false
         targetPort: 5001
-        transport: 'http'
+        exposedPort: 5001
+        transport: 'tcp'
         traffic: [
           {
             latestRevision: true
@@ -825,7 +827,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'api'
-            http: {
+            tcp: {
               metadata: {
                 concurrentRequests: '10'
               }
@@ -862,7 +864,8 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: false
         targetPort: 5002
-        transport: 'http'
+        exposedPort: 5002
+        transport: 'tcp'
         traffic: [
           {
             latestRevision: true
@@ -996,7 +999,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'plugin'
-            http: {
+            tcp: {
               metadata: {
                 concurrentRequests: '10'
               }
@@ -1026,7 +1029,8 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: false
         targetPort: 3000
-        transport: 'http'
+        exposedPort: 3000
+        transport: 'tcp'
         traffic: [
           {
             latestRevision: true
@@ -1074,7 +1078,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'web'
-            http: {
+            tcp: {
               metadata: {
                 concurrentRequests: '10'
               }
