@@ -121,11 +121,10 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
 }
 
 // Create ACA environment
-resource acaEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
+resource acaEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: acaEnvName
   location: location
   properties: {
-    // Modify structure to match latest API
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
@@ -133,18 +132,23 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
         sharedKey: logAnalytics.listKeys().primarySharedKey
       }
     }
-    // Use this instead of workloadProfiles
     zoneRedundant: false
     infrastructureResourceGroup: acaInfraRGName
     vnetConfiguration: {
       infrastructureSubnetId: acaSubnetId
       internal: false
     }
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
   }
 }
 
 // Mount Nginx file share to ACA environment
-resource nginxFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
+resource nginxFileShare 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
   name: 'nginxshare'
   parent: acaEnv
   properties: {
@@ -158,7 +162,7 @@ resource nginxFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01' 
 }
 
 // Add certificate to ACA environment (conditional)
-resource difyCerts 'Microsoft.App/managedEnvironments/certificates@2023-05-01' = if (isProvidedCert) {
+resource difyCerts 'Microsoft.App/managedEnvironments/certificates@2024-03-01' = if (isProvidedCert) {
   name: 'difycerts'
   parent: acaEnv
   location: location
@@ -169,11 +173,12 @@ resource difyCerts 'Microsoft.App/managedEnvironments/certificates@2023-05-01' =
 }
 
 // Change Nginx app resource definition
-resource nginxApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource nginxApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'nginx'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: true
@@ -241,7 +246,7 @@ resource nginxApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // Mount SSRF proxy file share to ACA environment
-resource ssrfProxyFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
+resource ssrfProxyFileShare 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
   name: 'ssrfproxyfileshare'
   parent: acaEnv
   properties: {
@@ -255,11 +260,12 @@ resource ssrfProxyFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-
 }
 
 // Deploy SSRF proxy app
-resource ssrfProxyApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource ssrfProxyApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'ssrfproxy'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: false
@@ -316,7 +322,7 @@ resource ssrfProxyApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // Mount Sandbox file share to ACA environment
-resource sandboxFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
+resource sandboxFileShare 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
   name: 'sandbox'
   parent: acaEnv
   properties: {
@@ -330,11 +336,12 @@ resource sandboxFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01
 }
 
 // Deploy Sandbox app
-resource sandboxApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'sandbox'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: false
@@ -421,11 +428,12 @@ resource sandboxApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // Deploy Worker app
-resource workerApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'worker'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {}
     template: {
       containers: [
@@ -575,11 +583,12 @@ resource workerApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // Deploy API app
-resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'api'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: false
@@ -829,7 +838,7 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // Mount Plugin file share to ACA environment
-resource pluginstorageFileShare 'Microsoft.App/managedEnvironments/storages@2023-05-01' = {
+resource pluginstorageFileShare 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
   name: 'pluginstoragefileshare'
   parent: acaEnv
   properties: {
@@ -843,11 +852,12 @@ resource pluginstorageFileShare 'Microsoft.App/managedEnvironments/storages@2023
 }
 
 // Deploy Plugin daemon app
-resource pluginDaemonApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'plugin'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: false
@@ -1006,11 +1016,12 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // Deploy Web app
-resource webApp 'Microsoft.App/containerApps@2023-05-01' = {
+resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'web'
   location: location
   properties: {
     environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
     configuration: {
       ingress: {
         external: false
