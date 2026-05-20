@@ -165,31 +165,34 @@ try {
 }
 
 if (-not $azcopyPath) {
-    Write-Host "azcopy not found. Attempting automatic installation..." -ForegroundColor Yellow
-    
-    # Download to temporary directory
+    # Check if already downloaded to temp directory
     $tempDir = Join-Path $env:TEMP "azcopy"
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-    
-    # Download Windows version of azcopy
-    $azcopyZip = Join-Path $tempDir "azcopy.zip"
-    $downloadUrl = "https://aka.ms/downloadazcopy-v10-windows"
-    
-    Write-Host "  Downloading azcopy..." -ForegroundColor Cyan
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $azcopyZip -UseBasicParsing
-    
-    # Extract
-    Write-Host "  Extracting azcopy..." -ForegroundColor Cyan
-    Expand-Archive -Path $azcopyZip -DestinationPath $tempDir -Force
-    
-    # Find azcopy.exe
-    $azcopyExe = Get-ChildItem -Path $tempDir -Filter "azcopy.exe" -Recurse | Select-Object -First 1
-    if ($azcopyExe) {
-        $azcopyPath = $azcopyExe.FullName
-        Write-Host "  Using azcopy: $azcopyPath" -ForegroundColor Green
+    $cachedExe = Get-ChildItem -Path $tempDir -Filter "azcopy.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($cachedExe) {
+        $azcopyPath = $cachedExe.FullName
+        Write-Host "Using cached azcopy: $azcopyPath" -ForegroundColor Gray
     } else {
-        Write-Warning "Failed to install azcopy. Falling back to az storage file upload."
-        $azcopyPath = $null
+        Write-Host "azcopy not found. Downloading..." -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+
+        $azcopyZip = Join-Path $tempDir "azcopy.zip"
+        $downloadUrl = "https://aka.ms/downloadazcopy-v10-windows"
+
+        Write-Host "  Downloading azcopy..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $azcopyZip -UseBasicParsing
+
+        # Extract
+        Write-Host "  Extracting azcopy..." -ForegroundColor Cyan
+        Expand-Archive -Path $azcopyZip -DestinationPath $tempDir -Force
+
+        $azcopyExe = Get-ChildItem -Path $tempDir -Filter "azcopy.exe" -Recurse | Select-Object -First 1
+        if ($azcopyExe) {
+            $azcopyPath = $azcopyExe.FullName
+            Write-Host "  Using azcopy: $azcopyPath" -ForegroundColor Green
+        } else {
+            Write-Warning "Failed to install azcopy. Falling back to az storage file upload."
+            $azcopyPath = $null
+        }
     }
 }
 
