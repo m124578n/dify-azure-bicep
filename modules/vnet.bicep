@@ -22,17 +22,15 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
         }
       }
       {
-        name: 'ACASubnet'
+        name: 'NginxSubnet'
+        properties: {
+          addressPrefix: '${ipPrefix}.1.0/24'
+        }
+      }
+      {
+        name: 'AppSubnet'
         properties: {
           addressPrefix: '${ipPrefix}.2.0/23'
-          delegations: [
-            {
-              name: 'aca-delegation'
-              properties: {
-                serviceName: 'Microsoft.App/environments'
-              }
-            }
-          ]
         }
       }
       {
@@ -61,5 +59,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
 output vnetId string = vnet.id
 output vnetName string = vnet.name
 output privateLinkSubnetId string = vnet.properties.subnets[0].id
-output acaSubnetId string = vnet.properties.subnets[1].id
-output postgresSubnetId string = vnet.properties.subnets[2].id
+output nginxSubnetId string = vnet.properties.subnets[1].id
+output appSubnetId string = vnet.properties.subnets[2].id
+output postgresSubnetId string = vnet.properties.subnets[3].id

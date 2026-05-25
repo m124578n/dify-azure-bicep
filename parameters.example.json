@@ -6,9 +6,6 @@
     "location": {
       "value": "japaneast"
     },
-    "acaInfraRGName": {
-      "value": "rg-dify-aca-infra"
-    },
     "pgsqlUser": {
       "value": "adminuser"
     },
@@ -30,35 +27,20 @@
     "redisCapacity": {
       "value": 0
     },
-    "isProvidedCert": {
-      "value": false
+    "adminUsername": {
+      "value": "azureuser"
     },
-    "acaCertPassword": {
-      "value": ""
+    "adminSshPublicKey": {
+      "value": "ssh-rsa YOUR_PUBLIC_KEY_HERE"
     },
-    "acaAppMinCount": {
-      "value": 0
+    "vmSize": {
+      "value": "Standard_D4s_v3"
     },
-    "isAcaEnabled": {
-      "value": true
+    "nginxVmSize": {
+      "value": "Standard_B2s"
     },
-    "apiCpu": {
-      "value": "2"
-    },
-    "apiMemory": {
-      "value": "4Gi"
-    },
-    "workerCpu": {
-      "value": "2"
-    },
-    "workerMemory": {
-      "value": "4Gi"
-    },
-    "webCpu": {
-      "value": "1"
-    },
-    "webMemory": {
-      "value": "2Gi"
+    "vmssInstanceCount": {
+      "value": 2
     }
   }
 }

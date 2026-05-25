@@ -25,35 +25,6 @@ param pgsqlUser string = 'user'
 @secure()
 param pgsqlPassword string = ''
 
-@description('ACA infrastructure resource group name')
-param acaInfraRGName string = 'rg-dify-aca-infra'
-
-@description('ACA environment name')
-param acaEnvName string = 'dify-aca-env'
-
-@description('ACA Log Analytics workspace name')
-param acaLogaName string = 'dify-loga'
-
-@description('Whether to provide a custom certificate')
-param isProvidedCert bool = true
-
-@description('Certificate content (Base64 encoded)')
-@secure()
-param acaCertBase64Value string = ''
-
-@description('Certificate password')
-@secure()
-param acaCertPassword string = ''
-
-@description('Dify custom domain')
-param acaDifyCustomerDomain string = 'dify.example.com'
-
-@description('Minimum instance count for ACA app')
-param acaAppMinCount int = 0
-
-@description('Whether to enable ACA')
-param isAcaEnabled bool = false
-
 @description('Dify API image')
 param difyApiImage string = 'langgenius/dify-api:1.10.1-fix.1'
 
@@ -81,23 +52,20 @@ param postgresEnableHA bool = false
 @description('Redis cache capacity (0=250MB, 1=1GB, 2=6GB, 3=13GB)')
 param redisCapacity int = 0
 
-@description('API container CPU')
-param apiCpu string = '2'
+@description('Admin username for VMs')
+param adminUsername string = 'azureuser'
 
-@description('API container memory')
-param apiMemory string = '4Gi'
+@description('SSH public key for admin user')
+param adminSshPublicKey string
 
-@description('Worker container CPU')
-param workerCpu string = '2'
+@description('VM size for VMSS instances')
+param vmSize string = 'Standard_D4s_v3'
 
-@description('Worker container memory')
-param workerMemory string = '4Gi'
+@description('VM size for nginx VM')
+param nginxVmSize string = 'Standard_B2s'
 
-@description('Web container CPU')
-param webCpu string = '1'
-
-@description('Web container memory')
-param webMemory string = '2Gi'
+@description('Initial VMSS instance count')
+param vmssInstanceCount int = 2
 
 
 // Generate hash for unique resource names
@@ -174,8 +142,8 @@ params: {
   }
 }
 
-// Deploy Redis cache (conditional)
-module redisModule './modules/redis-cache.bicep' = if (isAcaEnabled) {
+// Deploy Redis cache
+module redisModule './modules/redis-cache.bicep' = {
   name: 'redisDeploy'
 params: {
     location: location
@@ -186,47 +154,60 @@ params: {
   }
 }
 
-// Deploy ACA environment and apps
-module acaModule './modules/aca-env.bicep' = {
-  name: 'acaEnvDeploy'
-params: {
+// Deploy load balancers
+module lbModule './modules/load-balancer.bicep' = {
+  name: 'lbDeploy'
+  params: {
     location: location
-    acaInfraRGName: acaInfraRGName
-    acaEnvName: acaEnvName
-    acaLogaName: acaLogaName
-    acaSubnetId: vnetModule.outputs.acaSubnetId
-    isProvidedCert: isProvidedCert
-    acaCertBase64Value: acaCertBase64Value
-    acaCertPassword: acaCertPassword
-    acaDifyCustomerDomain: acaDifyCustomerDomain
-    acaAppMinCount: acaAppMinCount
-    storageAccountName: storageModule.outputs.storageAccountName
-    storageAccountKey: storageModule.outputs.storageAccountKey
-    storageContainerName: storageAccountContainer
-    nginxShareName: nginxFileShareModule.outputs.shareName
-    sandboxShareName: sandboxFileShareModule.outputs.shareName
-    ssrfProxyShareName: ssrfProxyFileShareModule.outputs.shareName
-    pluginStorageShareName: pluginStorageFileShareModule.outputs.shareName
+    nginxSubnetId: vnetModule.outputs.nginxSubnetId
+    appSubnetId: vnetModule.outputs.appSubnetId
+    internalLbPrivateIp: '${ipPrefix}.2.4'
+  }
+}
+
+// Deploy nginx VM
+module nginxVmModule './modules/nginx-vm.bicep' = {
+  name: 'nginxVmDeploy'
+  params: {
+    location: location
+    nginxSubnetId: vnetModule.outputs.nginxSubnetId
+    publicLbBackendPoolId: lbModule.outputs.publicLbBackendPoolId
+    internalLbIp: lbModule.outputs.internalLbPrivateIp
+    adminUsername: adminUsername
+    adminSshPublicKey: adminSshPublicKey
+    vmSize: nginxVmSize
+  }
+}
+
+// Deploy VM Scale Set
+module vmssModule './modules/vmss.bicep' = {
+  name: 'vmssDeploy'
+  params: {
+    location: location
+    appSubnetId: vnetModule.outputs.appSubnetId
+    internalLbBackendPoolId: lbModule.outputs.internalLbBackendPoolId
+    adminUsername: adminUsername
+    adminSshPublicKey: adminSshPublicKey
+    vmSize: vmSize
+    instanceCount: vmssInstanceCount
     postgresServerFqdn: postgresqlModule.outputs.serverFqdn
     postgresAdminLogin: pgsqlUser
     postgresAdminPassword: pgsqlPassword
     postgresDifyDbName: postgresqlModule.outputs.difyDbName
     postgresVectorDbName: postgresqlModule.outputs.vectorDbName
-    redisHostName: redisModule.?outputs.redisHostName ?? ''
-    redisPrimaryKey: redisModule.?outputs.redisPrimaryKey ?? ''
+    redisHostName: redisModule.outputs.redisHostName
+    redisPrimaryKey: redisModule.outputs.redisPrimaryKey
+    storageAccountName: storageModule.outputs.storageAccountName
+    storageAccountKey: storageModule.outputs.storageAccountKey
+    storageContainerName: storageAccountContainer
+    blobEndpoint: storageModule.outputs.blobEndpoint
     difyApiImage: difyApiImage
     difySandboxImage: difySandboxImage
     difyWebImage: difyWebImage
     difyPluginDaemonImage: difyPluginDaemonImage
-    blobEndpoint: storageModule.outputs.blobEndpoint
-    apiCpu: apiCpu
-    apiMemory: apiMemory
-    workerCpu: workerCpu
-    workerMemory: workerMemory
-    webCpu: webCpu
-    webMemory: webMemory
   }
 }
 
 // Post-deployment output
-output difyAppUrl string = acaModule.outputs.difyAppUrl
+output difyPublicIp string = lbModule.outputs.publicIpAddress
+output difyFqdn string = lbModule.outputs.publicIpFqdn
