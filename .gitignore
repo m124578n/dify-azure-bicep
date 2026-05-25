@@ -17,6 +17,7 @@ parameters.*.json
 
 # Bicep build output
 *.json.bak
+main.json
 
 # Editor
 .vscode/settings.json

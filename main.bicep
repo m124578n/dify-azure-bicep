@@ -159,7 +159,6 @@ module lbModule './modules/load-balancer.bicep' = {
   name: 'lbDeploy'
   params: {
     location: location
-    nginxSubnetId: vnetModule.outputs.nginxSubnetId
     appSubnetId: vnetModule.outputs.appSubnetId
     internalLbPrivateIp: '${ipPrefix}.2.4'
   }

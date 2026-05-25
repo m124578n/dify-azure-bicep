@@ -1,9 +1,6 @@
 @description('Resource group location')
 param location string
 
-@description('Subnet ID for nginx VMs')
-param nginxSubnetId string
-
 @description('Subnet ID for app VMSS')
 param appSubnetId string
 
