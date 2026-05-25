@@ -24,13 +24,13 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
       {
         name: 'AKSSubnet'
         properties: {
-          addressPrefix: '${ipPrefix}.2.0/22'
+          addressPrefix: '${ipPrefix}.2.0/23'
         }
       }
       {
         name: 'PostgresSubnet'
         properties: {
-          addressPrefix: '${ipPrefix}.8.0/24'
+          addressPrefix: '${ipPrefix}.4.0/24'
           serviceEndpoints: [
             {
               service: 'Microsoft.Storage'
