@@ -25,18 +25,6 @@ param pgsqlUser string = 'user'
 @secure()
 param pgsqlPassword string = ''
 
-@description('Dify API image')
-param difyApiImage string = 'langgenius/dify-api:1.10.1-fix.1'
-
-@description('Dify sandbox image')
-param difySandboxImage string = 'langgenius/dify-sandbox:0.2.12'
-
-@description('Dify web image')
-param difyWebImage string = 'langgenius/dify-web:1.10.1-fix.1'
-
-@description('Dify plugin daemon image')
-param difyPluginDaemonImage string = 'langgenius/dify-plugin-daemon:0.4.1-local'
-
 @description('PostgreSQL SKU name')
 param postgresSkuName string = 'Standard_B1ms'
 
@@ -52,20 +40,17 @@ param postgresEnableHA bool = false
 @description('Redis cache capacity (0=250MB, 1=1GB, 2=6GB, 3=13GB)')
 param redisCapacity int = 0
 
-@description('Admin username for VMs')
-param adminUsername string = 'azureuser'
+@description('VM size for AKS nodes')
+param aksNodeSize string = 'Standard_D4s_v3'
 
-@description('SSH public key for admin user')
-param adminSshPublicKey string
+@description('Initial AKS node count')
+param aksNodeCount int = 2
 
-@description('VM size for VMSS instances')
-param vmSize string = 'Standard_D4s_v3'
+@description('Minimum AKS node count for auto-scaling')
+param aksMinNodeCount int = 2
 
-@description('VM size for nginx VM')
-param nginxVmSize string = 'Standard_B2s'
-
-@description('Initial VMSS instance count')
-param vmssInstanceCount int = 2
+@description('Maximum AKS node count for auto-scaling')
+param aksMaxNodeCount int = 10
 
 
 // Generate hash for unique resource names
@@ -74,7 +59,7 @@ var rgNameHex = uniqueString(resourceGroup().id)
 // Deploy network-related resources
 module vnetModule './modules/vnet.bicep' = {
   name: 'vnetDeploy'
-params: {
+  params: {
     location: location
     ipPrefix: ipPrefix
   }
@@ -83,7 +68,7 @@ params: {
 // Deploy storage account and file share
 module storageModule './modules/storage.bicep' = {
   name: 'storageDeploy'
-params: {
+  params: {
     location: location
     storageAccountName: '${storageAccountBase}${rgNameHex}'
     containerName: storageAccountContainer
@@ -95,7 +80,7 @@ params: {
 // Deploy file shares
 module nginxFileShareModule './modules/fileshare.bicep' = {
   name: 'nginxFileShareDeploy'
-params: {
+  params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'nginx'
   }
@@ -103,7 +88,7 @@ params: {
 
 module sandboxFileShareModule './modules/fileshare.bicep' = {
   name: 'sandboxFileShareDeploy'
-params: {
+  params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'sandbox'
   }
@@ -111,7 +96,7 @@ params: {
 
 module ssrfProxyFileShareModule './modules/fileshare.bicep' = {
   name: 'ssrfProxyFileShareDeploy'
-params: {
+  params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'ssrfproxy'
   }
@@ -119,7 +104,7 @@ params: {
 
 module pluginStorageFileShareModule './modules/fileshare.bicep' = {
   name: 'pluginStorageFileShareDeploy'
-params: {
+  params: {
     storageAccountName: storageModule.outputs.storageAccountName
     shareName: 'pluginstorage'
   }
@@ -128,7 +113,7 @@ params: {
 // Deploy PostgreSQL server
 module postgresqlModule './modules/postgresql.bicep' = {
   name: 'postgresqlDeploy'
-params: {
+  params: {
     location: location
     serverName: '${psqlFlexibleBase}${rgNameHex}'
     administratorLogin: pgsqlUser
@@ -145,7 +130,7 @@ params: {
 // Deploy Redis cache
 module redisModule './modules/redis-cache.bicep' = {
   name: 'redisDeploy'
-params: {
+  params: {
     location: location
     redisName: '${redisNameBase}${rgNameHex}'
     privateLinkSubnetId: vnetModule.outputs.privateLinkSubnetId
@@ -154,59 +139,22 @@ params: {
   }
 }
 
-// Deploy load balancers
-module lbModule './modules/load-balancer.bicep' = {
-  name: 'lbDeploy'
+// Deploy AKS cluster
+module aksModule './modules/aks.bicep' = {
+  name: 'aksDeploy'
   params: {
     location: location
-    appSubnetId: vnetModule.outputs.appSubnetId
-    internalLbPrivateIp: '${ipPrefix}.2.4'
-  }
-}
-
-// Deploy nginx VM
-module nginxVmModule './modules/nginx-vm.bicep' = {
-  name: 'nginxVmDeploy'
-  params: {
-    location: location
-    nginxSubnetId: vnetModule.outputs.nginxSubnetId
-    publicLbBackendPoolId: lbModule.outputs.publicLbBackendPoolId
-    internalLbIp: lbModule.outputs.internalLbPrivateIp
-    adminUsername: adminUsername
-    adminSshPublicKey: adminSshPublicKey
-    vmSize: nginxVmSize
-  }
-}
-
-// Deploy VM Scale Set
-module vmssModule './modules/vmss.bicep' = {
-  name: 'vmssDeploy'
-  params: {
-    location: location
-    appSubnetId: vnetModule.outputs.appSubnetId
-    internalLbBackendPoolId: lbModule.outputs.internalLbBackendPoolId
-    adminUsername: adminUsername
-    adminSshPublicKey: adminSshPublicKey
-    vmSize: vmSize
-    instanceCount: vmssInstanceCount
-    postgresServerFqdn: postgresqlModule.outputs.serverFqdn
-    postgresAdminLogin: pgsqlUser
-    postgresAdminPassword: pgsqlPassword
-    postgresDifyDbName: postgresqlModule.outputs.difyDbName
-    postgresVectorDbName: postgresqlModule.outputs.vectorDbName
-    redisHostName: redisModule.outputs.redisHostName
-    redisPrimaryKey: redisModule.outputs.redisPrimaryKey
-    storageAccountName: storageModule.outputs.storageAccountName
-    storageAccountKey: storageModule.outputs.storageAccountKey
-    storageContainerName: storageAccountContainer
-    blobEndpoint: storageModule.outputs.blobEndpoint
-    difyApiImage: difyApiImage
-    difySandboxImage: difySandboxImage
-    difyWebImage: difyWebImage
-    difyPluginDaemonImage: difyPluginDaemonImage
+    aksSubnetId: vnetModule.outputs.aksSubnetId
+    nodeSize: aksNodeSize
+    nodeCount: aksNodeCount
+    minNodeCount: aksMinNodeCount
+    maxNodeCount: aksMaxNodeCount
   }
 }
 
 // Post-deployment output
-output difyPublicIp string = lbModule.outputs.publicIpAddress
-output difyFqdn string = lbModule.outputs.publicIpFqdn
+output aksClusterName string = aksModule.outputs.aksClusterName
+output postgresServerFqdn string = postgresqlModule.outputs.serverFqdn
+output redisHostName string = redisModule.outputs.redisHostName
+output storageAccountName string = storageModule.outputs.storageAccountName
+output blobEndpoint string = storageModule.outputs.blobEndpoint

@@ -22,21 +22,15 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
         }
       }
       {
-        name: 'NginxSubnet'
+        name: 'AKSSubnet'
         properties: {
-          addressPrefix: '${ipPrefix}.1.0/24'
-        }
-      }
-      {
-        name: 'AppSubnet'
-        properties: {
-          addressPrefix: '${ipPrefix}.2.0/23'
+          addressPrefix: '${ipPrefix}.2.0/22'
         }
       }
       {
         name: 'PostgresSubnet'
         properties: {
-          addressPrefix: '${ipPrefix}.4.0/24'
+          addressPrefix: '${ipPrefix}.8.0/24'
           serviceEndpoints: [
             {
               service: 'Microsoft.Storage'
@@ -59,6 +53,5 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
 output vnetId string = vnet.id
 output vnetName string = vnet.name
 output privateLinkSubnetId string = vnet.properties.subnets[0].id
-output nginxSubnetId string = vnet.properties.subnets[1].id
-output appSubnetId string = vnet.properties.subnets[2].id
-output postgresSubnetId string = vnet.properties.subnets[3].id
+output aksSubnetId string = vnet.properties.subnets[1].id
+output postgresSubnetId string = vnet.properties.subnets[2].id
