@@ -41,6 +41,9 @@
     },
     "vmssInstanceCount": {
       "value": 2
+    },
+    "alertEmail": {
+      "value": "example@gmail.com"
     }
   }
 }
