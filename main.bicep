@@ -65,7 +65,7 @@ param vmSize string = 'Standard_D4s_v3'
 param nginxVmSize string = 'Standard_B2s'
 
 @description('Initial VMSS instance count')
-param vmssInstanceCount int = 2
+param vmssInstanceCount int = 1
 
 
 // Generate hash for unique resource names
