@@ -17,7 +17,7 @@ param adminSshPublicKey string
 param vmSize string = 'Standard_D4s_v3'
 
 @description('Initial instance count')
-param instanceCount int = 2
+param instanceCount int = 1
 
 @description('PostgreSQL server FQDN')
 param postgresServerFqdn string
@@ -210,8 +210,9 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-07-01' = {
               typeHandlerVersion: '1.0'
               autoUpgradeMinorVersion: true
               settings: {
-                protocol: 'tcp'
+                protocol: 'http'
                 port: 80
+                requestPath: '/'
               }
             }
           }
@@ -232,7 +233,7 @@ resource autoscale 'Microsoft.Insights/autoscaleSettings@2022-10-01' = {
       {
         name: 'default'
         capacity: {
-          minimum: '2'
+          minimum: '1'
           maximum: '10'
           default: string(instanceCount)
         }
@@ -264,7 +265,7 @@ resource autoscale 'Microsoft.Insights/autoscaleSettings@2022-10-01' = {
               timeWindow: 'PT10M'
               timeAggregation: 'Average'
               operator: 'LessThan'
-              threshold: 30
+              threshold: 45
             }
             scaleAction: {
               direction: 'Decrease'

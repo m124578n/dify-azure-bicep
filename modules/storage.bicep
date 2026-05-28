@@ -16,10 +16,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   properties: {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
-    publicNetworkAccess: 'Enabled'  // Temporarily changed to Enabled
+    publicNetworkAccess: 'Disabled'
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Allow'  // Temporarily changed to Allow
+      defaultAction: 'Deny'
     }
   }
 }
