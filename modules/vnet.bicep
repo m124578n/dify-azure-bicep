@@ -4,6 +4,31 @@ param location string
 @description('IP prefix')
 param ipPrefix string
 
+resource natGatewayPip 'Microsoft.Network/publicIPAddresses@2023-05-01' = {
+  name: 'pip-nat-gateway'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+  }
+}
+
+resource natGateway 'Microsoft.Network/natGateways@2023-05-01' = {
+  name: 'nat-gateway-app'
+  location: location
+  sku: {
+    name: 'Standard'
+  }
+  properties: {
+    publicIpAddresses: [
+      { id: natGatewayPip.id }
+    ]
+    idleTimeoutInMinutes: 4
+  }
+}
+
 resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
   name: 'vnet-${location}'
   location: location
@@ -31,6 +56,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
         name: 'AppSubnet'
         properties: {
           addressPrefix: '${ipPrefix}.2.0/23'
+          natGateway: {
+            id: natGateway.id
+          }
         }
       }
       {
