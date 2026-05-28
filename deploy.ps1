@@ -110,20 +110,22 @@ if (-not $storageAccountKey) {
     exit 1
 }
 
-# Enable storage account audit logging (for troubleshooting)
-Write-Host "Enabling storage account audit logging..." -ForegroundColor Cyan
-az storage account update --name $storageAccountName --resource-group $ResourceGroupName --enable-local-user true
+# Temporarily enable public access for file upload (storage is Disabled by default)
+Write-Host "Temporarily enabling storage account public access for file upload..." -ForegroundColor Yellow
+az storage account update --name $storageAccountName --resource-group $ResourceGroupName --public-network-access Enabled --default-action Deny --output none
 
 # Get client IP and add to firewall
+$clientIP = $null
 try {
     $clientIP = (Invoke-RestMethod -Uri 'https://api.ipify.org?format=json' -TimeoutSec 10).ip
     if ($clientIP) {
-        Write-Host "Adding current IP address: $clientIP to storage account firewall" -ForegroundColor Yellow
-        az storage account network-rule add --account-name $storageAccountName --resource-group $ResourceGroupName --ip-address $clientIP
+        Write-Host "Adding current IP $clientIP to storage firewall..." -ForegroundColor Yellow
+        az storage account network-rule add --account-name $storageAccountName --resource-group $ResourceGroupName --ip-address $clientIP --output none
+        Start-Sleep -Seconds 10
     }
 }
 catch {
-    Write-Warning "Failed to retrieve IP address. Skipping firewall configuration."
+    Write-Warning "Failed to retrieve client IP. Storage firewall rule not added - upload may fail if not in VNet."
 }
 
 # Fix SAS token generation
@@ -153,8 +155,6 @@ try {
     $useSasEnv = $false
     $sasToken = $null
 }
-
-Write-Host "SAS Token: $sasToken"
 
 # Check for azcopy existence and install if needed
 $azcopyPath = $null
@@ -201,7 +201,8 @@ if ($azcopyPath) {
 }
 
 # Upload files to file shares
-$shares = @("nginx", "ssrfproxy", "sandbox")
+$shares = @("nginx", "ssrfproxy", "sandbox", "pluginstorage")
+$useAzCli = $false
 
 foreach ($share in $shares) {
     Write-Host "Processing file share '$share'..." -ForegroundColor Cyan
@@ -370,179 +371,43 @@ foreach ($share in $shares) {
     }
 }
 
-# Restore original settings after file upload
+# Restore storage account security settings after file upload
 Write-Host "Restoring storage account security settings..." -ForegroundColor Yellow
-az storage account update --name $storageAccountName --resource-group $ResourceGroupName --default-action Deny
-az storage account update --name $storageAccountName --resource-group $ResourceGroupName --bypass AzureServices
+if ($clientIP) {
+    az storage account network-rule remove --account-name $storageAccountName --resource-group $ResourceGroupName --ip-address $clientIP --output none
+}
+az storage account update --name $storageAccountName --resource-group $ResourceGroupName --public-network-access Disabled --output none
+Write-Host "Storage account locked down." -ForegroundColor Green
 
-# Restart Container Apps (execute only once)
-Write-Host "Restarting Nginx app..." -ForegroundColor Cyan
-$latestRevision = az containerapp revision list --name nginx --resource-group $ResourceGroupName --query "[0].name" -o tsv
-if ($latestRevision) {
-    az containerapp revision restart --name nginx --resource-group $ResourceGroupName --revision $latestRevision
+# Show VMSS status
+Write-Host "Checking VMSS status..." -ForegroundColor Cyan
+$vmssName = az vmss list --resource-group $ResourceGroupName --query "[0].name" -o tsv
+if ($vmssName) {
+    Write-Host "VMSS: $vmssName" -ForegroundColor Green
+    az vmss list-instances --resource-group $ResourceGroupName --name $vmssName `
+        --query "[].{Instance:instanceId, State:provisioningState, Power:powerState}" -o table
 } else {
-    Write-Warning "Latest revision of Nginx not found"
+    Write-Warning "No VMSS found in resource group $ResourceGroupName"
 }
 
+Write-Host ""
+Write-Host "NOTE: DB migration runs automatically via MIGRATION_ENABLED=true in cloud-init." -ForegroundColor Yellow
+Write-Host "      Allow 3-5 minutes for cloud-init to complete on first boot." -ForegroundColor Yellow
 
-# Database initialization section
-Write-Host "Starting Dify database initialization..." -ForegroundColor Cyan
-
-# Logic to wait until API container is ready
-function Wait-ForApiContainer {
-    $maxAttempts = 10
-    $attempt = 0
-    $ready = $false
-    
-    Write-Host "Waiting for API container to be ready..." -ForegroundColor Yellow
-    
-    while (-not $ready -and $attempt -lt $maxAttempts) {
-        $attempt++
-        Write-Host "  Attempt $attempt/$maxAttempts..." -ForegroundColor Gray
-        
-        # Check container status
-        $status = az containerapp show --name api --resource-group $ResourceGroupName --query "properties.latestRevisionStatus" -o tsv 2>$null
-        
-        if ($status -eq "Running") {
-            # Test if application is actually responding
-            try {
-                $testResult = az containerapp exec --name api --resource-group $ResourceGroupName --command "echo 'Test connection'" 2>$null
-                if ($LASTEXITCODE -eq 0) {
-                    $ready = $true
-                    Write-Host "  API container is ready" -ForegroundColor Green
-                    break
-                }
-            } catch {
-                # Ignore errors and continue
-            }
-        }
-        
-        Write-Host "  API container is not ready yet. Waiting 30 seconds..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 30
-    }
-    
-    return $ready
-}
-
-# Function to execute migration command more robustly
-function Invoke-MigrationCommand {
-    param (
-        [string]$Command,
-        [string]$Description,
-        [int]$TimeoutSeconds = 300,
-        [int]$MaxRetries = 3
-    )
-    
-    $retry = 0
-    $success = $false
-    
-    while (-not $success -and $retry -lt $MaxRetries) {
-        $retry++
-        Write-Host "Executing $Description... (attempt $retry/$MaxRetries)" -ForegroundColor Yellow
-        
-        try {
-            # Execute as background job to handle timeout
-            $job = Start-Job -ScriptBlock {
-                param ($ResourceGroupName, $Command)
-                az containerapp exec --name api --resource-group $ResourceGroupName --command $Command 2>&1
-                return $LASTEXITCODE
-            } -ArgumentList $ResourceGroupName, $Command
-            
-            # Wait for specified time
-            if (Wait-Job -Job $job -Timeout $TimeoutSeconds) {
-                $result = Receive-Job -Job $job
-                
-                # Get last element if result is array
-                if ($result -is [array]) {
-                    $exitCode = $result[-1]
-                } else {
-                    $exitCode = $LASTEXITCODE
-                }
-                
-                if ($exitCode -eq 0) {
-                    Write-Host "  $Description completed successfully" -ForegroundColor Green
-                    $success = $true
-                } else {
-                    Write-Warning "  $Description failed: $result"
-                }
-            } else {
-                Write-Warning "  $Description timed out (${TimeoutSeconds} seconds)"
-                Stop-Job -Job $job
-            }
-            
-            Remove-Job -Job $job -Force
-        } catch {
-            Write-Warning "  Error occurred while executing command: $_"
-        }
-        
-        if (-not $success -and $retry -lt $MaxRetries) {
-            $waitTime = [Math]::Pow(2, $retry) * 15  # Exponential backoff
-            Write-Host "  Retrying after ${waitTime} seconds..." -ForegroundColor Yellow
-            Start-Sleep -Seconds $waitTime
-        }
-    }
-    
-    return $success
-}
-
-# Wait for API container to be ready
-# $apiReady = Wait-ForApiContainer
-$apiReady = $true
-if (-not $apiReady) {
-    Write-Warning "API container was not ready. Please run initialization commands manually later."
-    Write-Host "To run initialization manually, execute the following command:" -ForegroundColor Yellow
-    Write-Host "az containerapp exec --name api --resource-group $ResourceGroupName --command 'flask db upgrade'" -ForegroundColor Gray
-} else {
-    # Check API container environment variables
-    Write-Host "Checking API container environment variables..." -ForegroundColor Cyan
-    $envVars = az containerapp show --name api --resource-group $ResourceGroupName --query "properties.template.containers[0].env" -o json | ConvertFrom-Json
-    
-    # Check if required environment variables are set
-    $requiredVars = @("DB_HOST", "DB_USERNAME", "DB_PASSWORD", "DB_DATABASE")
-    $missingVars = @()
-    
-    foreach ($var in $requiredVars) {
-        $found = $false
-        foreach ($envVar in $envVars) {
-            if ($envVar.name -eq $var) {
-                $found = $true
-                break
-            }
-        }
-        
-        if (-not $found) {
-            $missingVars += $var
-        }
-    }
-    
-    if ($missingVars.Count -gt 0) {
-        Write-Warning "The following environment variables are not set in the API container: $($missingVars -join ', ')"
-        Write-Host "Please check the Bicep template and verify that the required environment variables are set." -ForegroundColor Yellow
-    }
-    
-    # Execute database initialization
-    $psqlServer = az postgres flexible-server list --resource-group $ResourceGroupName --query "[0].name" -o tsv
-
-    # Command to get detailed migration logs
-    $debugMigrationCommand = 'flask db upgrade'
-    Write-Host "Running migration with detailed debug information..." -ForegroundColor Cyan
-    az containerapp exec --name api --resource-group $ResourceGroupName --command $debugMigrationCommand    
-    
-    Write-Host "Database initialization completed" -ForegroundColor Green        
-}
-
-# Get Container Apps endpoints
+# Get endpoint from public LB
+Write-Host ""
+Write-Host "Dify Endpoints:" -ForegroundColor Cyan
 try {
-    $apiUrl = az containerapp show --name api --resource-group $ResourceGroupName --query "properties.configuration.ingress.fqdn" -o tsv
-    $webUrl = az containerapp show --name web --resource-group $ResourceGroupName --query "properties.configuration.ingress.fqdn" -o tsv
-    $nginxUrl = az containerapp show --name nginx --resource-group $ResourceGroupName --query "properties.configuration.ingress.fqdn" -o tsv
-    
-    Write-Host "Dify Endpoints:" -ForegroundColor Cyan
-    Write-Host "Main UI (Nginx): https://$nginxUrl" -ForegroundColor Green
-    Write-Host "API: https://$apiUrl" -ForegroundColor Green
-    Write-Host "Web: https://$webUrl" -ForegroundColor Green
+    $publicIp   = az network public-ip show --resource-group $ResourceGroupName --name pip-dify-lb --query "ipAddress" -o tsv
+    $publicFqdn = az network public-ip show --resource-group $ResourceGroupName --name pip-dify-lb --query "dnsSettings.fqdn" -o tsv
+    if ($publicFqdn) {
+        Write-Host "Main URL: http://$publicFqdn" -ForegroundColor Green
+    }
+    if ($publicIp) {
+        Write-Host "IP:       http://$publicIp" -ForegroundColor Green
+    }
 } catch {
-    Write-Warning "Failed to retrieve endpoint information: $_"
+    Write-Warning "Failed to retrieve endpoint: $_"
 }
 
 Write-Host "Deployment completed!" -ForegroundColor Green
