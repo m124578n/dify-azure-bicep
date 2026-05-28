@@ -143,6 +143,12 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
         name: 'Consumption'
         workloadProfileType: 'Consumption'
       }
+      {
+        name: 'D8'
+        workloadProfileType: 'D8'
+        minimumCount: 1
+        maximumCount: 3
+      }
     ]
   }
 }
@@ -178,7 +184,7 @@ resource nginxApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {
       ingress: {
         external: true
@@ -265,7 +271,7 @@ resource ssrfProxyApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {
       ingress: {
         external: false
@@ -341,7 +347,7 @@ resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {
       ingress: {
         external: false
@@ -434,7 +440,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {}
     template: {
       containers: [
@@ -589,7 +595,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {
       ingress: {
         external: false
@@ -859,7 +865,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {
       ingress: {
         external: false
@@ -1024,7 +1030,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   properties: {
     environmentId: acaEnv.id
-    workloadProfileName: 'Consumption'
+    workloadProfileName: 'D8'
     configuration: {
       ingress: {
         external: false
@@ -1082,6 +1088,179 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
               metadata: {
                 concurrentRequests: '10'
               }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+// Deploy extra worker app (Consumption, scales 0→N based on Redis Celery queue depth)
+resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: 'extra-worker'
+  location: location
+  properties: {
+    environmentId: acaEnv.id
+    workloadProfileName: 'Consumption'
+    configuration: {
+      secrets: [
+        {
+          name: 'redis-password'
+          value: redisPrimaryKey
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'langgenius'
+          image: difyApiImage
+          resources: {
+            cpu: json(workerCpu)
+            memory: workerMemory
+          }
+          env: [
+            {
+              name: 'MODE'
+              value: 'worker'
+            }
+            {
+              name: 'LOG_LEVEL'
+              value: 'INFO'
+            }
+            {
+              name: 'SECRET_KEY'
+              value: 'dify-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U'
+            }
+            {
+              name: 'DB_USERNAME'
+              value: postgresAdminLogin
+            }
+            {
+              name: 'DB_PASSWORD'
+              value: postgresAdminPassword
+            }
+            {
+              name: 'DB_HOST'
+              value: postgresServerFqdn
+            }
+            {
+              name: 'DB_PORT'
+              value: '5432'
+            }
+            {
+              name: 'DB_DATABASE'
+              value: postgresDifyDbName
+            }
+            {
+              name: 'REDIS_HOST'
+              value: redisHostName
+            }
+            {
+              name: 'REDIS_PORT'
+              value: '6379'
+            }
+            {
+              name: 'REDIS_PASSWORD'
+              value: redisPrimaryKey
+            }
+            {
+              name: 'REDIS_USE_SSL'
+              value: 'false'
+            }
+            {
+              name: 'REDIS_DB'
+              value: '0'
+            }
+            {
+              name: 'CELERY_BROKER_URL'
+              value: empty(redisHostName) ? '' : 'redis://:${redisPrimaryKey}@${redisHostName}:6379/1'
+            }
+            {
+              name: 'STORAGE_TYPE'
+              value: 'azure-blob'
+            }
+            {
+              name: 'AZURE_BLOB_ACCOUNT_NAME'
+              value: storageAccountName
+            }
+            {
+              name: 'AZURE_BLOB_ACCOUNT_KEY'
+              value: storageAccountKey
+            }
+            {
+              name: 'AZURE_BLOB_ACCOUNT_URL'
+              value: blobEndpoint
+            }
+            {
+              name: 'AZURE_BLOB_CONTAINER_NAME'
+              value: storageContainerName
+            }
+            {
+              name: 'VECTOR_STORE'
+              value: 'pgvector'
+            }
+            {
+              name: 'PGVECTOR_HOST'
+              value: postgresServerFqdn
+            }
+            {
+              name: 'PGVECTOR_PORT'
+              value: '5432'
+            }
+            {
+              name: 'PGVECTOR_USER'
+              value: postgresAdminLogin
+            }
+            {
+              name: 'PGVECTOR_PASSWORD'
+              value: postgresAdminPassword
+            }
+            {
+              name: 'PGVECTOR_DATABASE'
+              value: postgresVectorDbName
+            }
+            {
+              name: 'INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH'
+              value: '1000'
+            }
+            {
+              name: 'PLUGIN_DAEMON_URL'
+              value: 'http://plugin:5002'
+            }
+            {
+              name: 'PLUGIN_DAEMON_KEY'
+              value: 'lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi'
+            }
+            {
+              name: 'INNER_API_KEY_FOR_PLUGIN'
+              value: '-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1'
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 0
+        maxReplicas: 5
+        rules: [
+          {
+            name: 'redis-celery-queue'
+            custom: {
+              type: 'redis'
+              metadata: {
+                address: '${redisHostName}:6379'
+                listName: 'celery'
+                listLength: '5'
+                databaseIndex: '1'
+                useTLS: 'false'
+              }
+              auth: [
+                {
+                  secretRef: 'redis-password'
+                  triggerParameter: 'password'
+                }
+              ]
             }
           }
         ]
