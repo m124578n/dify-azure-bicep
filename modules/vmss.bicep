@@ -117,7 +117,7 @@ resource nsgApp 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
 }
 
 // Cloud-init script assembled as Bicep string vars
-var cloudInitPart1 = '#!/bin/bash\nset -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y docker.io docker-compose-v2 cifs-utils\nsystemctl enable docker && systemctl start docker\nmkdir -p /mnt/nginx /mnt/sandbox /mnt/ssrfproxy /mnt/pluginstorage /opt/dify\n\n# Mount Azure Files\nfor SHARE in nginx sandbox ssrfproxy pluginstorage; do\n  mount -t cifs //${storageAccountName}.file.core.windows.net/\${SHARE} /mnt/\${SHARE} \\\n    -o "username=${storageAccountName},password=${storageAccountKey},vers=3.0,serverino,dir_mode=0755,file_mode=0644" || echo "Warning: Failed to mount \${SHARE}"\n  echo "//${storageAccountName}.file.core.windows.net/\${SHARE} /mnt/\${SHARE} cifs username=${storageAccountName},password=${storageAccountKey},vers=3.0,serverino,dir_mode=0755,file_mode=0644,_netdev 0 0" >> /etc/fstab\ndone\n\n'
+var cloudInitPart1 = '#!/bin/bash\nset -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y docker.io docker-compose-v2 cifs-utils\nmkdir -p /etc/docker\necho \'{"log-driver":"journald"}\' > /etc/docker/daemon.json\nsystemctl enable docker && systemctl start docker\nmkdir -p /mnt/nginx /mnt/sandbox /mnt/ssrfproxy /mnt/pluginstorage /opt/dify\n\n# Mount Azure Files\nfor SHARE in nginx sandbox ssrfproxy pluginstorage; do\n  mount -t cifs //${storageAccountName}.file.core.windows.net/\${SHARE} /mnt/\${SHARE} \\\n    -o "username=${storageAccountName},password=${storageAccountKey},vers=3.0,serverino,dir_mode=0755,file_mode=0644" || echo "Warning: Failed to mount \${SHARE}"\n  echo "//${storageAccountName}.file.core.windows.net/\${SHARE} /mnt/\${SHARE} cifs username=${storageAccountName},password=${storageAccountKey},vers=3.0,serverino,dir_mode=0755,file_mode=0644,_netdev 0 0" >> /etc/fstab\ndone\n\n'
 
 var cloudInitEnvFile = 'cat > /opt/dify/.env << \'ENVEOF\'\nLOG_LEVEL=INFO\nSECRET_KEY=dify-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U\nCONSOLE_WEB_URL=\nINIT_PASSWORD=\nCONSOLE_API_URL=\nSERVICE_API_URL=\nAPP_WEB_URL=\nFILES_URL=\nFILES_ACCESS_TIMEOUT=300\nMIGRATION_ENABLED=true\nDB_USERNAME=${postgresAdminLogin}\nDB_PASSWORD=${postgresAdminPassword}\nDB_HOST=${postgresServerFqdn}\nDB_PORT=5432\nDB_DATABASE=${postgresDifyDbName}\nWEB_API_CORS_ALLOW_ORIGINS=*\nCONSOLE_CORS_ALLOW_ORIGINS=*\nREDIS_HOST=${redisHostName}\nREDIS_PORT=6379\nREDIS_PASSWORD=${redisPrimaryKey}\nREDIS_USE_SSL=false\nREDIS_DB=0\nCELERY_BROKER_URL=redis://:${redisPrimaryKey}@${redisHostName}:6379/1\nSTORAGE_TYPE=azure-blob\nAZURE_BLOB_ACCOUNT_NAME=${storageAccountName}\nAZURE_BLOB_ACCOUNT_KEY=${storageAccountKey}\nAZURE_BLOB_ACCOUNT_URL=${blobEndpoint}\nAZURE_BLOB_CONTAINER_NAME=${storageContainerName}\nVECTOR_STORE=pgvector\nPGVECTOR_HOST=${postgresServerFqdn}\nPGVECTOR_PORT=5432\nPGVECTOR_USER=${postgresAdminLogin}\nPGVECTOR_PASSWORD=${postgresAdminPassword}\nPGVECTOR_DATABASE=${postgresVectorDbName}\nCODE_EXECUTION_API_KEY=dify-sandbox\nCODE_EXECUTION_ENDPOINT=http://sandbox:8194\nCODE_MAX_NUMBER=9223372036854775807\nCODE_MIN_NUMBER=-9223372036854775808\nCODE_MAX_STRING_LENGTH=80000\nTEMPLATE_TRANSFORM_MAX_LENGTH=80000\nCODE_MAX_OBJECT_ARRAY_LENGTH=30\nCODE_MAX_STRING_ARRAY_LENGTH=30\nCODE_MAX_NUMBER_ARRAY_LENGTH=1000\nINDEXING_MAX_SEGMENTATION_TOKENS_LENGTH=1000\nPLUGIN_DAEMON_URL=http://plugin:5002\nPLUGIN_DAEMON_KEY=lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi\nINNER_API_KEY_FOR_PLUGIN=-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1\nGIN_MODE=release\nSERVER_PORT=5002\nSERVER_KEY=lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi\nPLATFORM=local\nDIFY_INNER_API_KEY=-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1\nDIFY_INNER_API_URL=http://api:5001\nPLUGIN_STORAGE_TYPE=local\nPLUGIN_WORKING_PATH=cwd\nPLUGIN_INSTALLED_PATH=plugin\nDB_SSL_MODE=require\nPLUGIN_WEBHOOK_ENABLED=true\nPLUGIN_REMOTE_INSTALLING_ENABLED=false\nFORCE_VERIFYING_SIGNATURE=false\nAPI_KEY=dify-sandbox\nWORKER_TIMEOUT=15\nENABLE_NETWORK=true\nHTTP_PROXY=http://ssrf_proxy:3128\nHTTPS_PROXY=http://ssrf_proxy:3128\nSANDBOX_PORT=8194\nENVEOF\n\n'
 
@@ -131,6 +131,9 @@ var cloudInitScript = '${cloudInitPart1}${cloudInitEnvFile}${cloudInitDockerComp
 resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-07-01' = {
   name: 'vmss-dify'
   location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
   sku: {
     name: vmSize
     tier: 'Standard'
@@ -216,6 +219,16 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-07-01' = {
               }
             }
           }
+          {
+            name: 'AzureMonitorLinuxAgent'
+            properties: {
+              publisher: 'Microsoft.Azure.Monitor'
+              type: 'AzureMonitorLinuxAgent'
+              typeHandlerVersion: '1.0'
+              autoUpgradeMinorVersion: true
+              enableAutomaticUpgrade: true
+            }
+          }
         ]
       }
     }
@@ -282,3 +295,4 @@ resource autoscale 'Microsoft.Insights/autoscaleSettings@2022-10-01' = {
 
 output vmssId string = vmss.id
 output vmssName string = vmss.name
+output vmssPrincipalId string = vmss.identity.principalId

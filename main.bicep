@@ -67,6 +67,9 @@ param nginxVmSize string = 'Standard_B2s'
 @description('Initial VMSS instance count')
 param vmssInstanceCount int = 1
 
+@description('Alert email address for CPU alerts (leave empty to skip)')
+param alertEmail string = ''
+
 
 // Generate hash for unique resource names
 var rgNameHex = uniqueString(resourceGroup().id)
@@ -207,6 +210,18 @@ module vmssModule './modules/vmss.bicep' = {
   }
 }
 
+// Deploy monitoring (Log Analytics, AMA, DCR, optional alerts)
+module monitoringModule './modules/monitoring.bicep' = {
+  name: 'monitoringDeploy'
+  params: {
+    location: location
+    vmssName: vmssModule.outputs.vmssName
+    vmssPrincipalId: vmssModule.outputs.vmssPrincipalId
+    alertEmail: alertEmail
+  }
+}
+
 // Post-deployment output
 output difyPublicIp string = lbModule.outputs.publicIpAddress
 output difyFqdn string = lbModule.outputs.publicIpFqdn
+output logAnalyticsWorkspace string = monitoringModule.outputs.workspaceName
