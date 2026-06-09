@@ -1,64 +1,154 @@
 {
-  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-  "contentVersion": "1.0.0.0",
-  "resourceGroupName": "rg-dify-dev",
-  "parameters": {
-    "location": {
-      "value": "japaneast"
-    },
-    "acaInfraRGName": {
-      "value": "rg-dify-aca-infra"
-    },
-    "pgsqlUser": {
-      "value": "adminuser"
-    },
-    "pgsqlPassword": {
-      "value": "YOUR_SECURE_PASSWORD_HERE"
-    },
-    "postgresSkuName": {
-      "value": "Standard_B1ms"
-    },
-    "postgresSkuTier": {
-      "value": "Burstable"
-    },
-    "postgresStorageGB": {
-      "value": 32
-    },
-    "postgresEnableHA": {
-      "value": false
-    },
-    "redisCapacity": {
-      "value": 0
-    },
-    "isProvidedCert": {
-      "value": false
-    },
-    "acaCertPassword": {
-      "value": ""
-    },
-    "acaAppMinCount": {
-      "value": 0
-    },
-    "isAcaEnabled": {
-      "value": true
-    },
-    "apiCpu": {
-      "value": "2"
-    },
-    "apiMemory": {
-      "value": "4Gi"
-    },
-    "workerCpu": {
-      "value": "2"
-    },
-    "workerMemory": {
-      "value": "4Gi"
-    },
-    "webCpu": {
-      "value": "1"
-    },
-    "webMemory": {
-      "value": "2Gi"
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "resourceGroupName": "rg-dify-dev",
+    "parameters": {
+        "location": {
+            "value": "japaneast"
+        },
+        "acaInfraRGName": {
+            "value": "rg-dify-aca-infra"
+        },
+        "pgsqlUser": {
+            "value": "adminuser"
+        },
+        "pgsqlPassword": {
+            "value": "YOUR_SECURE_PASSWORD_HERE"
+        },
+        "postgresSkuName": {
+            "value": "Standard_D2s_v3"
+        },
+        "postgresSkuTier": {
+            "value": "GeneralPurpose"
+        },
+        "postgresStorageGB": {
+            "value": 32
+        },
+        "postgresEnableHA": {
+            "value": false
+        },
+        "redisSku": {
+            "value": "Balanced_B1"
+        },
+        "isProvidedCert": {
+            "value": false
+        },
+        "acaCertPassword": {
+            "value": ""
+        },
+        "acaAppMinCount": {
+            "value": 1
+        },
+        "isAcaEnabled": {
+            "value": true
+        },
+        "apiCpu": {
+            "value": "2"
+        },
+        "apiMemory": {
+            "value": "4Gi"
+        },
+        "workerCpu": {
+            "value": "2"
+        },
+        "workerMemory": {
+            "value": "4Gi"
+        },
+        "webCpu": {
+            "value": "1"
+        },
+        "webMemory": {
+            "value": "2Gi"
+        },
+        "difySecretKey": {
+            "value": "YOUR_SECURE_KEY_HERE"
+        },
+        "pluginDaemonKey": {
+            "value": "YOUR_SECURE_KEY_HERE"
+        },
+        "innerApiKey": {
+            "value": "YOUR_SECURE_KEY_HERE"
+        },
+        "sandboxApiKey": {
+            "value": "YOUR_SECURE_KEY_HERE"
+        },
+        "webApiCorsAllowOrigins": {
+            "value": "*"
+        },
+        "consoleCorsAllowOrigins": {
+            "value": "*"
+        },
+        "nginxCpu": {
+            "value": "0.5"
+        },
+        "nginxMemory": {
+            "value": "1Gi"
+        },
+        "ssrfProxyCpu": {
+            "value": "0.5"
+        },
+        "ssrfProxyMemory": {
+            "value": "1Gi"
+        },
+        "sandboxCpu": {
+            "value": "0.5"
+        },
+        "sandboxMemory": {
+            "value": "1Gi"
+        },
+        "pluginCpu": {
+            "value": "2"
+        },
+        "pluginMemory": {
+            "value": "4Gi"
+        },
+        "nginxMaxReplicas": {
+            "value": 10
+        },
+        "apiMaxReplicas": {
+            "value": 10
+        },
+        "workerMaxReplicas": {
+            "value": 10
+        },
+        "webMaxReplicas": {
+            "value": 10
+        },
+        "pluginMaxReplicas": {
+            "value": 10
+        },
+        "sandboxMaxReplicas": {
+            "value": 10
+        },
+        "ssrfProxyMaxReplicas": {
+            "value": 10
+        },
+        "extraWorkerMaxReplicas": {
+            "value": 5
+        },
+        "nginxConcurrentRequests": {
+            "value": "50"
+        },
+        "apiConcurrentRequests": {
+            "value": "10"
+        },
+        "workerQueueLength": {
+            "value": "20"
+        },
+        "webConcurrentRequests": {
+            "value": "50"
+        },
+        "pluginConcurrentRequests": {
+            "value": "20"
+        },
+        "sandboxConcurrentRequests": {
+            "value": "4"
+        },
+        "ssrfProxyConcurrentRequests": {
+            "value": "20"
+        },
+        "extraWorkerQueueLength": {
+            "value": "20"
+        }
     }
-  }
 }

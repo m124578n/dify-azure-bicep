@@ -49,7 +49,7 @@ param acaCertPassword string = ''
 param acaDifyCustomerDomain string = 'dify.example.com'
 
 @description('Minimum instance count for ACA app')
-param acaAppMinCount int = 0
+param acaAppMinCount int = 1
 
 @description('Whether to enable ACA')
 param isAcaEnabled bool = false
@@ -67,10 +67,10 @@ param difyWebImage string = 'langgenius/dify-web:1.10.1-fix.1'
 param difyPluginDaemonImage string = 'langgenius/dify-plugin-daemon:0.4.1-local'
 
 @description('PostgreSQL SKU name')
-param postgresSkuName string = 'Standard_B1ms'
+param postgresSkuName string = 'Standard_D2s_v3'
 
 @description('PostgreSQL SKU tier')
-param postgresSkuTier string = 'Burstable'
+param postgresSkuTier string = 'GeneralPurpose'
 
 @description('PostgreSQL storage size in GB')
 param postgresStorageGB int = 32
@@ -78,8 +78,8 @@ param postgresStorageGB int = 32
 @description('Enable PostgreSQL high availability')
 param postgresEnableHA bool = false
 
-@description('Redis cache capacity (0=250MB, 1=1GB, 2=6GB, 3=13GB)')
-param redisCapacity int = 0
+@description('Azure Managed Redis SKU (Balanced_B1, Balanced_B3, Balanced_B5, Balanced_B10)')
+param redisSku string = 'Balanced_B1'
 
 @description('API container CPU')
 param apiCpu string = '2'
@@ -99,6 +99,99 @@ param webCpu string = '1'
 @description('Web container memory')
 param webMemory string = '2Gi'
 
+@description('Dify secret key')
+@secure()
+param difySecretKey string = 'dify-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U'
+
+@description('Plugin daemon / server shared key')
+@secure()
+param pluginDaemonKey string = 'lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi'
+
+@description('Inner API key for plugin integration')
+@secure()
+param innerApiKey string = '-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1'
+
+@description('Sandbox API key')
+@secure()
+param sandboxApiKey string = 'dify-sandbox'
+
+@description('Allowed origins for Web API CORS')
+param webApiCorsAllowOrigins string = '*'
+
+@description('Allowed origins for Console CORS')
+param consoleCorsAllowOrigins string = '*'
+
+@description('Nginx container CPU')
+param nginxCpu string = '0.5'
+
+@description('Nginx container memory')
+param nginxMemory string = '1Gi'
+
+@description('SSRF proxy container CPU')
+param ssrfProxyCpu string = '0.5'
+
+@description('SSRF proxy container memory')
+param ssrfProxyMemory string = '1Gi'
+
+@description('Sandbox container CPU')
+param sandboxCpu string = '0.5'
+
+@description('Sandbox container memory')
+param sandboxMemory string = '1Gi'
+
+@description('Plugin daemon container CPU')
+param pluginCpu string = '2'
+
+@description('Plugin daemon container memory')
+param pluginMemory string = '4Gi'
+
+@description('Nginx max replicas')
+param nginxMaxReplicas int = 10
+
+@description('API max replicas')
+param apiMaxReplicas int = 10
+
+@description('Worker max replicas')
+param workerMaxReplicas int = 10
+
+@description('Web max replicas')
+param webMaxReplicas int = 10
+
+@description('Plugin daemon max replicas')
+param pluginMaxReplicas int = 10
+
+@description('Sandbox max replicas')
+param sandboxMaxReplicas int = 10
+
+@description('SSRF proxy max replicas')
+param ssrfProxyMaxReplicas int = 10
+
+@description('Extra worker max replicas')
+param extraWorkerMaxReplicas int = 5
+
+@description('Nginx HTTP concurrent requests scale threshold')
+param nginxConcurrentRequests string = '50'
+
+@description('API TCP concurrent requests scale threshold')
+param apiConcurrentRequests string = '10'
+
+@description('Worker Redis queue length scale threshold')
+param workerQueueLength string = '20'
+
+@description('Web TCP concurrent requests scale threshold')
+param webConcurrentRequests string = '50'
+
+@description('Plugin daemon TCP concurrent requests scale threshold')
+param pluginConcurrentRequests string = '20'
+
+@description('Sandbox TCP concurrent requests scale threshold')
+param sandboxConcurrentRequests string = '4'
+
+@description('SSRF proxy TCP concurrent requests scale threshold')
+param ssrfProxyConcurrentRequests string = '20'
+
+@description('Extra worker Redis queue length scale threshold')
+param extraWorkerQueueLength string = '20'
 
 // Generate hash for unique resource names
 var rgNameHex = uniqueString(resourceGroup().id)
@@ -182,7 +275,7 @@ params: {
     redisName: '${redisNameBase}${rgNameHex}'
     privateLinkSubnetId: vnetModule.outputs.privateLinkSubnetId
     vnetId: vnetModule.outputs.vnetId
-    redisCapacity: redisCapacity
+    redisSku: redisSku
   }
 }
 
@@ -225,6 +318,36 @@ params: {
     workerMemory: workerMemory
     webCpu: webCpu
     webMemory: webMemory
+    difySecretKey: difySecretKey
+    pluginDaemonKey: pluginDaemonKey
+    innerApiKey: innerApiKey
+    sandboxApiKey: sandboxApiKey
+    webApiCorsAllowOrigins: webApiCorsAllowOrigins
+    consoleCorsAllowOrigins: consoleCorsAllowOrigins
+    nginxCpu: nginxCpu
+    nginxMemory: nginxMemory
+    ssrfProxyCpu: ssrfProxyCpu
+    ssrfProxyMemory: ssrfProxyMemory
+    sandboxCpu: sandboxCpu
+    sandboxMemory: sandboxMemory
+    pluginCpu: pluginCpu
+    pluginMemory: pluginMemory
+    nginxMaxReplicas: nginxMaxReplicas
+    apiMaxReplicas: apiMaxReplicas
+    workerMaxReplicas: workerMaxReplicas
+    webMaxReplicas: webMaxReplicas
+    pluginMaxReplicas: pluginMaxReplicas
+    sandboxMaxReplicas: sandboxMaxReplicas
+    ssrfProxyMaxReplicas: ssrfProxyMaxReplicas
+    extraWorkerMaxReplicas: extraWorkerMaxReplicas
+    nginxConcurrentRequests: nginxConcurrentRequests
+    apiConcurrentRequests: apiConcurrentRequests
+    workerQueueLength: workerQueueLength
+    webConcurrentRequests: webConcurrentRequests
+    pluginConcurrentRequests: pluginConcurrentRequests
+    sandboxConcurrentRequests: sandboxConcurrentRequests
+    ssrfProxyConcurrentRequests: ssrfProxyConcurrentRequests
+    extraWorkerQueueLength: extraWorkerQueueLength
   }
 }
 

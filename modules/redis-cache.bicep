@@ -10,12 +10,12 @@ param privateLinkSubnetId string
 @description('Virtual network ID')
 param vnetId string
 
-@description('Redis cache capacity (0=250MB, 1=1GB, 2=6GB, 3=13GB)')
-param redisCapacity int = 0
+@description('Azure Managed Redis SKU (Balanced_B1, Balanced_B3, Balanced_B5, Balanced_B10)')
+param redisSku string = 'Balanced_B1'
 
 // Private DNS zone
 resource redisDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.redis.cache.windows.net'
+  name: 'privatelink.redis.azure.net'
   location: 'global'
 }
 
@@ -32,23 +32,27 @@ resource redisVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@20
   }
 }
 
-// Redis cache
-resource redisCache 'Microsoft.Cache/Redis@2023-08-01' = {
+// Azure Managed Redis instance
+resource redisEnterprise 'Microsoft.Cache/redisEnterprise@2025-04-01' = {
   name: redisName
   location: location
+  sku: {
+    name: redisSku
+  }
   properties: {
-    sku: {
-      name: 'Standard'
-      family: 'C'
-      capacity: redisCapacity
-    }
-    enableNonSslPort: true
     minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Disabled'
-    redisVersion: '6'
-    redisConfiguration: {
-      'maxmemory-policy': 'allkeys-lru'
-    }
+  }
+}
+
+// Redis database (Azure Managed Redis only supports a single database, index 0)
+resource redisDb 'Microsoft.Cache/redisEnterprise/databases@2025-04-01' = {
+  name: 'default'
+  parent: redisEnterprise
+  properties: {
+    clientProtocol: 'Encrypted'
+    evictionPolicy: 'AllKeysLRU'
+    clusteringPolicy: 'OSSCluster'
+    port: 10000
   }
 }
 
@@ -64,9 +68,9 @@ resource redisPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = 
       {
         name: 'psc-redis'
         properties: {
-          privateLinkServiceId: redisCache.id
+          privateLinkServiceId: redisEnterprise.id
           groupIds: [
-            'redisCache'
+            'redisEnterprise'
           ]
         }
       }
@@ -76,7 +80,7 @@ resource redisPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = 
 
 // Private endpoint DNS group
 resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-05-01' = {
-  name: 'pdz-stor'
+  name: 'pdz-redis'
   parent: redisPrivateEndpoint
   properties: {
     privateDnsZoneConfigs: [
@@ -91,6 +95,6 @@ resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZ
 }
 
 // Output
-output redisHostName string = redisCache.properties.hostName
+output redisHostName string = redisEnterprise.properties.hostName
 #disable-next-line outputs-should-not-contain-secrets
-output redisPrimaryKey string = redisCache.listKeys().primaryKey
+output redisPrimaryKey string = redisDb.listKeys().primaryKey

@@ -108,6 +108,100 @@ param difyPluginDaemonImage string
 @description('Blob endpoint')
 param blobEndpoint string
 
+@description('Dify secret key')
+@secure()
+param difySecretKey string
+
+@description('Plugin daemon / server shared key')
+@secure()
+param pluginDaemonKey string
+
+@description('Inner API key shared between api/worker and plugin daemon')
+@secure()
+param innerApiKey string
+
+@description('Sandbox API key (CODE_EXECUTION_API_KEY / API_KEY)')
+@secure()
+param sandboxApiKey string
+
+@description('Allowed origins for Web API CORS')
+param webApiCorsAllowOrigins string = '*'
+
+@description('Allowed origins for Console CORS')
+param consoleCorsAllowOrigins string = '*'
+
+@description('Nginx container CPU')
+param nginxCpu string = '0.5'
+
+@description('Nginx container memory')
+param nginxMemory string = '1Gi'
+
+@description('SSRF proxy container CPU')
+param ssrfProxyCpu string = '0.5'
+
+@description('SSRF proxy container memory')
+param ssrfProxyMemory string = '1Gi'
+
+@description('Sandbox container CPU')
+param sandboxCpu string = '0.5'
+
+@description('Sandbox container memory')
+param sandboxMemory string = '1Gi'
+
+@description('Plugin daemon container CPU')
+param pluginCpu string = '2'
+
+@description('Plugin daemon container memory')
+param pluginMemory string = '4Gi'
+
+@description('Nginx max replicas')
+param nginxMaxReplicas int = 10
+
+@description('API max replicas')
+param apiMaxReplicas int = 10
+
+@description('Worker max replicas')
+param workerMaxReplicas int = 10
+
+@description('Web max replicas')
+param webMaxReplicas int = 10
+
+@description('Plugin daemon max replicas')
+param pluginMaxReplicas int = 10
+
+@description('Sandbox max replicas')
+param sandboxMaxReplicas int = 10
+
+@description('SSRF proxy max replicas')
+param ssrfProxyMaxReplicas int = 10
+
+@description('Extra worker max replicas')
+param extraWorkerMaxReplicas int = 5
+
+@description('Nginx HTTP concurrent requests scale threshold')
+param nginxConcurrentRequests string = '50'
+
+@description('API TCP concurrent requests scale threshold')
+param apiConcurrentRequests string = '10'
+
+@description('Worker Redis queue length scale threshold')
+param workerQueueLength string = '20'
+
+@description('Web TCP concurrent requests scale threshold')
+param webConcurrentRequests string = '50'
+
+@description('Plugin daemon TCP concurrent requests scale threshold')
+param pluginConcurrentRequests string = '20'
+
+@description('Sandbox TCP concurrent requests scale threshold')
+param sandboxConcurrentRequests string = '4'
+
+@description('SSRF proxy TCP concurrent requests scale threshold')
+param ssrfProxyConcurrentRequests string = '20'
+
+@description('Extra worker Redis queue length scale threshold')
+param extraWorkerQueueLength string = '20'
+
 // Create Log Analytics workspace
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: acaLogaName
@@ -147,7 +241,7 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
         name: 'D8'
         workloadProfileType: 'D8'
         minimumCount: 1
-        maximumCount: 3
+        maximumCount: 5
       }
     ]
   }
@@ -210,8 +304,8 @@ resource nginxApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'nginx'
           image: 'nginx:latest'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json(nginxCpu)
+            memory: nginxMemory
           }
           volumeMounts: [
             {
@@ -228,13 +322,13 @@ resource nginxApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       scale: {
         minReplicas: 1
-        maxReplicas: 10
+        maxReplicas: nginxMaxReplicas
         rules: [
           {
             name: 'nginx'
             http: {
               metadata: {
-                concurrentRequests: '10'
+                concurrentRequests: nginxConcurrentRequests
               }
             }
           }
@@ -291,8 +385,8 @@ resource ssrfProxyApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'ssrfproxy'
           image: 'ubuntu/squid:latest'
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json(ssrfProxyCpu)
+            memory: ssrfProxyMemory
           }
           volumeMounts: [
             {
@@ -304,13 +398,13 @@ resource ssrfProxyApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       scale: {
         minReplicas: acaAppMinCount
-        maxReplicas: 10
+        maxReplicas: ssrfProxyMaxReplicas
         rules: [
           {
             name: 'ssrfproxy'
             tcp: {
               metadata: {
-                concurrentRequests: '10'
+                concurrentRequests: ssrfProxyConcurrentRequests
               }
             }
           }
@@ -368,13 +462,13 @@ resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'langgenius'
           image: difySandboxImage
           resources: {
-            cpu: json('0.5')
-            memory: '1Gi'
+            cpu: json(sandboxCpu)
+            memory: sandboxMemory
           }
           env: [
             {
               name: 'API_KEY'
-              value: 'dify-sandbox'
+              value: sandboxApiKey
             }
             {
               name: 'GIN_MODE'
@@ -411,13 +505,13 @@ resource sandboxApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       scale: {
         minReplicas: acaAppMinCount
-        maxReplicas: 10
+        maxReplicas: sandboxMaxReplicas
         rules: [
           {
             name: 'sandbox'
             tcp: {
               metadata: {
-                concurrentRequests: '10'
+                concurrentRequests: sandboxConcurrentRequests
               }
             }
           }
@@ -441,7 +535,14 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
   properties: {
     environmentId: acaEnv.id
     workloadProfileName: 'D8'
-    configuration: {}
+    configuration: {
+      secrets: [
+        {
+          name: 'redis-password'
+          value: redisPrimaryKey
+        }
+      ]
+    }
     template: {
       containers: [
         {
@@ -462,7 +563,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'SECRET_KEY'
-              value: 'dify-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U'
+              value: difySecretKey
             }
             {
               name: 'DB_USERNAME'
@@ -478,7 +579,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'DB_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'DB_DATABASE'
@@ -490,7 +591,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_PORT'
-              value: '6379'
+              value: '10000'
             }
             {
               name: 'REDIS_PASSWORD'
@@ -498,7 +599,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_USE_SSL'
-              value: 'false'
+              value: 'true'
             }
             {
               name: 'REDIS_DB'
@@ -506,7 +607,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'CELERY_BROKER_URL'
-              value: empty(redisHostName) ? '' : 'redis://:${redisPrimaryKey}@${redisHostName}:6379/1'
+              value: empty(redisHostName) ? '' : 'rediss://:${redisPrimaryKey}@${redisHostName}:10000/0'
             }
             {
               name: 'STORAGE_TYPE'
@@ -538,7 +639,7 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'PGVECTOR_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'PGVECTOR_USER'
@@ -562,25 +663,36 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'PLUGIN_DAEMON_KEY'
-              value: 'lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi'
+              value: pluginDaemonKey
             }
             {
               name: 'INNER_API_KEY_FOR_PLUGIN'
-              value: '-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1'
+              value: innerApiKey
             }
           ]
         }
       ]
       scale: {
         minReplicas: acaAppMinCount
-        maxReplicas: 10
+        maxReplicas: workerMaxReplicas
         rules: [
           {
-            name: 'worker'
-            tcp: {
+            name: 'worker-celery-queue'
+            custom: {
+              type: 'redis'
               metadata: {
-                concurrentRequests: '10'
+                address: '${redisHostName}:10000'
+                listName: 'celery'
+                listLength: workerQueueLength
+                databaseIndex: '0'
+                useTLS: 'true'
               }
+              auth: [
+                {
+                  secretRef: 'redis-password'
+                  triggerParameter: 'password'
+                }
+              ]
             }
           }
         ]
@@ -630,7 +742,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'SECRET_KEY'
-              value: 'dify-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U'
+              value: difySecretKey
             }
             {
               name: 'CONSOLE_WEB_URL'
@@ -665,6 +777,10 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: 'true'
             }
             {
+              name: 'SERVER_WORKER_AMOUNT'
+              value: '2'
+            }
+            {
               name: 'SENTRY_DSN'
               value: ''
             }
@@ -690,7 +806,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'DB_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'DB_DATABASE'
@@ -698,11 +814,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'WEB_API_CORS_ALLOW_ORIGINS'
-              value: '*'
+              value: webApiCorsAllowOrigins
             }
             {
               name: 'CONSOLE_CORS_ALLOW_ORIGINS'
-              value: '*'
+              value: consoleCorsAllowOrigins
             }
             {
               name: 'REDIS_HOST'
@@ -710,7 +826,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_PORT'
-              value: '6379'
+              value: '10000'
             }
             {
               name: 'REDIS_PASSWORD'
@@ -718,7 +834,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_USE_SSL'
-              value: 'false'
+              value: 'true'
             }
             {
               name: 'REDIS_DB'
@@ -726,7 +842,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'CELERY_BROKER_URL'
-              value: empty(redisHostName) ? '' : 'redis://:${redisPrimaryKey}@${redisHostName}:6379/1'
+              value: empty(redisHostName) ? '' : 'rediss://:${redisPrimaryKey}@${redisHostName}:10000/0'
             }
             {
               name: 'STORAGE_TYPE'
@@ -758,7 +874,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'PGVECTOR_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'PGVECTOR_USER'
@@ -774,7 +890,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'CODE_EXECUTION_API_KEY'
-              value: 'dify-sandbox'
+              value: sandboxApiKey
             }
             {
               name: 'CODE_EXECUTION_ENDPOINT'
@@ -818,24 +934,24 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'PLUGIN_DAEMON_KEY'
-              value: 'lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi'
+              value: pluginDaemonKey
             }
             {
               name: 'INNER_API_KEY_FOR_PLUGIN'
-              value: '-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1'
+              value: innerApiKey
             }
           ]
         }
       ]
       scale: {
         minReplicas: acaAppMinCount
-        maxReplicas: 10
+        maxReplicas: apiMaxReplicas
         rules: [
           {
             name: 'api'
             tcp: {
               metadata: {
-                concurrentRequests: '10'
+                concurrentRequests: apiConcurrentRequests
               }
             }
           }
@@ -886,8 +1002,8 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'langgenius'
           image: difyPluginDaemonImage
           resources: {
-            cpu: json('2')
-            memory: '4Gi'
+            cpu: json(pluginCpu)
+            memory: pluginMemory
           }
           volumeMounts: [
             {
@@ -906,7 +1022,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'SERVER_KEY'
-              value: 'lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi'
+              value: pluginDaemonKey
             }
             {
               name: 'PLATFORM'
@@ -914,7 +1030,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'DIFY_INNER_API_KEY'
-              value: '-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1'
+              value: innerApiKey
             }
             {
               name: 'DIFY_INNER_API_URL'
@@ -934,7 +1050,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'DB_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'DB_DATABASE'
@@ -946,7 +1062,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_PORT'
-              value: '6379'
+              value: '10000'
             }
             {
               name: 'REDIS_PASSWORD'
@@ -954,7 +1070,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_USE_SSL'
-              value: 'false'
+              value: 'true'
             }
             {
               name: 'REDIS_DB'
@@ -962,7 +1078,7 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'CELERY_BROKER_URL'
-              value: empty(redisHostName) ? '' : 'redis://:${redisPrimaryKey}@${redisHostName}:6379/1'
+              value: empty(redisHostName) ? '' : 'rediss://:${redisPrimaryKey}@${redisHostName}:10000/0'
             }
             {
               name: 'PLUGIN_STORAGE_TYPE'
@@ -1001,13 +1117,13 @@ resource pluginDaemonApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       scale: {
         minReplicas: acaAppMinCount
-        maxReplicas: 10
+        maxReplicas: pluginMaxReplicas
         rules: [
           {
             name: 'plugin'
             tcp: {
               metadata: {
-                concurrentRequests: '10'
+                concurrentRequests: pluginConcurrentRequests
               }
             }
           }
@@ -1080,13 +1196,13 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       scale: {
         minReplicas: acaAppMinCount
-        maxReplicas: 10
+        maxReplicas: webMaxReplicas
         rules: [
           {
             name: 'web'
             tcp: {
               metadata: {
-                concurrentRequests: '10'
+                concurrentRequests: webConcurrentRequests
               }
             }
           }
@@ -1096,7 +1212,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
-// Deploy extra worker app (Consumption, scales 0→N based on Redis Celery queue depth)
+// Deploy Extra Worker app
 resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'extra-worker'
   location: location
@@ -1131,7 +1247,7 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'SECRET_KEY'
-              value: 'dify-9f73s3ljTXVcMT3Blb3ljTqtsKiGHXVcMT3BlbkFJLK7U'
+              value: difySecretKey
             }
             {
               name: 'DB_USERNAME'
@@ -1147,7 +1263,7 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'DB_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'DB_DATABASE'
@@ -1159,7 +1275,7 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_PORT'
-              value: '6379'
+              value: '10000'
             }
             {
               name: 'REDIS_PASSWORD'
@@ -1167,7 +1283,7 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_USE_SSL'
-              value: 'false'
+              value: 'true'
             }
             {
               name: 'REDIS_DB'
@@ -1175,7 +1291,7 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'CELERY_BROKER_URL'
-              value: empty(redisHostName) ? '' : 'redis://:${redisPrimaryKey}@${redisHostName}:6379/1'
+              value: empty(redisHostName) ? '' : 'rediss://:${redisPrimaryKey}@${redisHostName}:10000/0'
             }
             {
               name: 'STORAGE_TYPE'
@@ -1207,7 +1323,7 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'PGVECTOR_PORT'
-              value: '5432'
+              value: '6432'
             }
             {
               name: 'PGVECTOR_USER'
@@ -1231,29 +1347,29 @@ resource extraWorkerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'PLUGIN_DAEMON_KEY'
-              value: 'lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi'
+              value: pluginDaemonKey
             }
             {
               name: 'INNER_API_KEY_FOR_PLUGIN'
-              value: '-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1'
+              value: innerApiKey
             }
           ]
         }
       ]
       scale: {
-        minReplicas: 0
-        maxReplicas: 5
+        minReplicas: acaAppMinCount
+        maxReplicas: extraWorkerMaxReplicas
         rules: [
           {
             name: 'redis-celery-queue'
             custom: {
               type: 'redis'
               metadata: {
-                address: '${redisHostName}:6379'
+                address: '${redisHostName}:10000'
                 listName: 'celery'
-                listLength: '5'
-                databaseIndex: '1'
-                useTLS: 'false'
+                listLength: extraWorkerQueueLength
+                databaseIndex: '0'
+                useTLS: 'true'
               }
               auth: [
                 {
