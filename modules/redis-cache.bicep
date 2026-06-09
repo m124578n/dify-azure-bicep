@@ -53,6 +53,7 @@ resource redisDb 'Microsoft.Cache/redisEnterprise/databases@2025-07-01' = {
     evictionPolicy: 'AllKeysLRU'
     clusteringPolicy: 'NoCluster'
     port: 10000
+    accessKeysAuthentication: 'Enabled'
   }
 }
 
