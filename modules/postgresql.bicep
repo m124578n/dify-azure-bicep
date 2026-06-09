@@ -18,10 +18,10 @@ param postgresSubnetId string
 param vnetId string
 
 @description('PostgreSQL SKU name')
-param postgresSkuName string = 'Standard_B1ms'
+param postgresSkuName string = 'Standard_D2s_v3'
 
 @description('PostgreSQL SKU tier')
-param postgresSkuTier string = 'Burstable'
+param postgresSkuTier string = 'GeneralPurpose'
 
 @description('PostgreSQL storage size in GB')
 param postgresStorageGB int = 32
@@ -107,6 +107,39 @@ resource pgVectorConfig 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
   ]
   properties: {
     value: 'uuid-ossp,vector'
+    source: 'user-override'
+  }
+}
+
+// Enable built-in PgBouncer (General Purpose / Memory Optimized tiers only)
+resource pgBouncerEnabled 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
+  name: 'pgbouncer.enabled'
+  parent: postgresServer
+  dependsOn: [pgVectorConfig]
+  properties: {
+    value: 'true'
+    source: 'user-override'
+  }
+}
+
+// PgBouncer: transaction mode (compatible with Dify / SQLAlchemy)
+resource pgBouncerPoolMode 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
+  name: 'pgbouncer.pool_mode'
+  parent: postgresServer
+  dependsOn: [pgBouncerEnabled]
+  properties: {
+    value: 'transaction'
+    source: 'user-override'
+  }
+}
+
+// PgBouncer: ignore startup params sent by SQLAlchemy / psycopg2
+resource pgBouncerIgnoreParams 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
+  name: 'pgbouncer.ignore_startup_parameters'
+  parent: postgresServer
+  dependsOn: [pgBouncerEnabled]
+  properties: {
+    value: 'extra_float_digits'
     source: 'user-override'
   }
 }

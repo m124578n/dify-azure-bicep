@@ -17,6 +17,10 @@ parameters.*.json
 
 # Bicep build output
 *.json.bak
+main.json
+
+# Claude Code internal
+.claude/
 
 # Editor
 .vscode/settings.json
