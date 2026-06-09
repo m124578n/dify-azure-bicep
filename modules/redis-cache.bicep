@@ -45,13 +45,13 @@ resource redisEnterprise 'Microsoft.Cache/redisEnterprise@2025-04-01' = {
 }
 
 // Redis database (Azure Managed Redis only supports a single database, index 0)
-resource redisDb 'Microsoft.Cache/redisEnterprise/databases@2025-04-01' = {
+resource redisDb 'Microsoft.Cache/redisEnterprise/databases@2025-07-01' = {
   name: 'default'
   parent: redisEnterprise
   properties: {
     clientProtocol: 'Encrypted'
     evictionPolicy: 'AllKeysLRU'
-    clusteringPolicy: 'NonClustered'
+    clusteringPolicy: 'NoCluster'
     port: 10000
   }
 }
