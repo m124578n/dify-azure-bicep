@@ -137,7 +137,7 @@ resource pgBouncerPoolMode 'Microsoft.DBforPostgreSQL/flexibleServers/configurat
 resource pgBouncerIgnoreParams 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2022-12-01' = {
   name: 'pgbouncer.ignore_startup_parameters'
   parent: postgresServer
-  dependsOn: [pgBouncerEnabled]
+  dependsOn: [pgBouncerPoolMode]
   properties: {
     value: 'extra_float_digits'
     source: 'user-override'
