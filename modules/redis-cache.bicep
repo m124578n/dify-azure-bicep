@@ -51,7 +51,7 @@ resource redisDb 'Microsoft.Cache/redisEnterprise/databases@2025-04-01' = {
   properties: {
     clientProtocol: 'Encrypted'
     evictionPolicy: 'AllKeysLRU'
-    clusteringPolicy: 'EnterpriseCluster'
+    clusteringPolicy: 'NonClustered'
     port: 10000
   }
 }
