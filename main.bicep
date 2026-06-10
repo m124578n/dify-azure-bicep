@@ -73,10 +73,10 @@ param postgresSkuName string = 'Standard_D2s_v3'
 param postgresSkuTier string = 'GeneralPurpose'
 
 @description('PostgreSQL storage size in GB')
-param postgresStorageGB int = 32
+param postgresStorageGB int = 128
 
 @description('Enable PostgreSQL high availability')
-param postgresEnableHA bool = false
+param postgresEnableHA bool = true
 
 @description('Azure Managed Redis SKU (Balanced_B1, Balanced_B3, Balanced_B5, Balanced_B10)')
 param redisSku string = 'Balanced_B1'
@@ -85,10 +85,10 @@ param redisSku string = 'Balanced_B1'
 param apiCpu string = '2'
 
 @description('API container memory')
-param apiMemory string = '4Gi'
+param apiMemory string = '6Gi'
 
 @description('Worker container CPU')
-param workerCpu string = '2'
+param workerCpu string = '1'
 
 @description('Worker container memory')
 param workerMemory string = '4Gi'
@@ -134,16 +134,16 @@ param ssrfProxyCpu string = '0.5'
 param ssrfProxyMemory string = '1Gi'
 
 @description('Sandbox container CPU')
-param sandboxCpu string = '0.5'
+param sandboxCpu string = '1'
 
 @description('Sandbox container memory')
-param sandboxMemory string = '1Gi'
+param sandboxMemory string = '3Gi'
 
 @description('Plugin daemon container CPU')
-param pluginCpu string = '2'
+param pluginCpu string = '1'
 
 @description('Plugin daemon container memory')
-param pluginMemory string = '4Gi'
+param pluginMemory string = '3Gi'
 
 @description('Nginx max replicas')
 param nginxMaxReplicas int = 10
@@ -173,7 +173,7 @@ param extraWorkerMaxReplicas int = 5
 param nginxConcurrentRequests string = '50'
 
 @description('API TCP concurrent requests scale threshold')
-param apiConcurrentRequests string = '10'
+param apiConcurrentRequests string = '70'
 
 @description('Worker Redis queue length scale threshold')
 param workerQueueLength string = '20'

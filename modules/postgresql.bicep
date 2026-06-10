@@ -24,10 +24,10 @@ param postgresSkuName string = 'Standard_D2s_v3'
 param postgresSkuTier string = 'GeneralPurpose'
 
 @description('PostgreSQL storage size in GB')
-param postgresStorageGB int = 32
+param postgresStorageGB int = 128
 
 @description('Enable high availability')
-param postgresEnableHA bool = false
+param postgresEnableHA bool = true
 
 // Private DNS zone
 resource postgresDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
